@@ -14,7 +14,9 @@ async function handler(req: NextRequest) {
   try {
     const user = (req as any).user
     const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status') as any || 'all'
+    const statusParam = searchParams.get('status')
+    // 'all' or missing param → no filter; otherwise pass the real status value
+    const status = (statusParam && statusParam !== 'all') ? statusParam as any : undefined
     const recent = searchParams.get('recent') === 'true'
     const limit = parseInt(searchParams.get('limit') || '50')
 
@@ -27,12 +29,12 @@ async function handler(req: NextRequest) {
       })
     }
 
-    const credits = await getStoreOwnerCredits(user.walletAddress, status, limit)
+    const credits = await getStoreOwnerCredits(user.walletAddress, status)
 
     return successResponse({
       credits,
       total: credits.length,
-      status: status === 'all' ? 'all statuses' : status,
+      status: status ?? 'all',
     })
   } catch (error) {
     console.error('[Store Owner Credits] Error:', error)

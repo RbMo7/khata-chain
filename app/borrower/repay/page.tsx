@@ -1,328 +1,319 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { PaymentMethodSelector } from '@/components/PaymentMethodSelector';
+import { Separator } from '@/components/ui/separator';
 import { StripeCheckoutForm } from '@/components/StripeCheckoutForm';
-import { Spinner } from '@/components/ui/spinner';
-import { 
-  CreditCard, 
-  Wallet, 
-  CheckCircle, 
-  AlertCircle,
-  ArrowLeft,
-  Info
-} from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle2, AlertCircle, ArrowLeft, Calendar, Store, Info } from 'lucide-react';
 import Link from 'next/link';
+import { formatNPR, formatDateNP } from '@/lib/currency-utils';
+import { useApi } from '@/hooks/use-api';
+import { creditApi } from '@/lib/api-client';
 
-interface CreditEntry {
-  id: string;
-  credit_amount: number;
-  borrower_pubkey: string;
-  store_owner_pubkey: string;
-  store_owner_name: string;
-  is_repaid: boolean;
-  created_at: string;
-  description?: string;
-  due_date?: string;
+function getDaysInfo(dueDate: string) {
+  const due = new Date(dueDate);
+  const today = new Date();
+  const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return { text: `${Math.abs(diffDays)} days overdue`, color: 'text-destructive' };
+  if (diffDays === 0) return { text: 'Due today', color: 'text-amber-600' };
+  if (diffDays <= 7) return { text: `Due in ${diffDays} day${diffDays === 1 ? '' : 's'}`, color: 'text-amber-600' };
+  return { text: `Due in ${diffDays} days`, color: 'text-muted-foreground' };
 }
-
-type PaymentMethod = 'tokens' | 'stripe' | 'hybrid';
 
 export default function BorrowerRepayPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const creditEntryId = searchParams.get('credit_entry_id');
 
-  const [creditEntry, setCreditEntry] = useState<CreditEntry | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('stripe');
-  const [stripeAvailable, setStripeAvailable] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [processingPayment, setProcessingPayment] = useState(false);
 
-  // Mock borrower wallet (in real app, get from auth)
-  const borrowerWallet = 'BorrowerPublicKeyHere';
+  const { data: res, loading, error } = useApi(
+    () => creditApi.getById(creditEntryId!),
+    [creditEntryId]
+  );
 
-  useEffect(() => {
-    const loadCreditEntry = async () => {
-      if (!creditEntryId) {
-        setError('Credit entry ID is required');
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        // In a real app, fetch from your API
-        // For now, mock data
-        setCreditEntry({
-          id: creditEntryId,
-          credit_amount: 1500000, // ₹15,000
-          borrower_pubkey: borrowerWallet,
-          store_owner_pubkey: 'StoreOwnerPublicKeyHere',
-          store_owner_name: 'Sharma Kirana Store',
-          is_repaid: false,
-          created_at: '2026-02-01',
-          description: 'Grocery supplies and household items',
-          due_date: '2026-03-15',
-        });
-        
-        // Check if store owner has Stripe connected
-        setStripeAvailable(true);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : 'Failed to load credit entry'
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadCreditEntry();
-  }, [creditEntryId, borrowerWallet]);
-
-  const handlePayment = async () => {
-    setProcessingPayment(true);
-    
-    // Simulate payment processing
-    setTimeout(() => {
-      setProcessingPayment(false);
-      setShowCheckout(true);
-    }, 1000);
-  };
-
-  const formatAmount = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN')}`;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
-
-  if (isLoading) {
+  if (!creditEntryId) {
     return (
       <DashboardLayout userType="borrower">
-        <div className="flex items-center justify-center py-12">
-          <Spinner className="h-6 w-6 mr-2" />
-          <p>Loading credit details...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (error || !creditEntry) {
-    return (
-      <DashboardLayout userType="borrower">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-4 pt-8">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error || 'Credit entry not found'}</AlertDescription>
+            <AlertDescription>No credit entry ID provided.</AlertDescription>
           </Alert>
-          <Link href="/borrower/dashboard">
-            <Button variant="outline" className="mt-4">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Dashboard
-            </Button>
+          <Link href="/borrower/credits">
+            <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" />Back to Credits</Button>
           </Link>
         </div>
       </DashboardLayout>
     );
   }
 
-  const amountInPaise = creditEntry.credit_amount;
+  if (loading) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  return (
-    <DashboardLayout userType="borrower">
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Link href="/borrower/dashboard">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
+  if (error || !res?.data) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="max-w-2xl mx-auto space-y-4 pt-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error || 'Credit entry not found or you do not have access to it.'}</AlertDescription>
+          </Alert>
+          <Link href="/borrower/credits">
+            <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" />Back to Credits</Button>
+          </Link>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const credit = res.data;
+  const isPaid =
+    credit.status === 'completed' ||
+    credit.repayment_status === 'completed';
+  const isCancelled = credit.status === 'cancelled' || credit.status === 'rejected';
+  const storeName = credit.store_owners?.store_name ?? credit.store_owner_pubkey;
+  const daysInfo = credit.due_date ? getDaysInfo(credit.due_date) : null;
+
+  // ── Already Paid ──────────────────────────────────────────────────────────
+  if (isPaid) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="flex items-center gap-3">
+            <Link href="/borrower/credits">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />Back to Credits
+              </Button>
+            </Link>
+          </div>
+
+          <Card className="border-emerald-200">
+            <CardContent className="pt-8 pb-8 text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="p-4 rounded-full bg-emerald-100">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-600" />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-emerald-700">Credit Paid</h2>
+                <p className="text-muted-foreground mt-1">
+                  This credit has already been fully settled.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/50 p-4 text-sm text-left space-y-2 max-w-sm mx-auto">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Store</span>
+                  <span className="font-medium">{storeName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-bold">{formatNPR(credit.credit_amount)}</span>
+                </div>
+                {credit.due_date && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Due Date</span>
+                    <span>{formatDateNP(credit.due_date)}</span>
+                  </div>
+                )}
+              </div>
+              <Link href="/borrower/credits">
+                <Button variant="outline" className="mt-2">View All Credits</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ── Cancelled / Rejected ──────────────────────────────────────────────────
+  if (isCancelled) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="max-w-2xl mx-auto space-y-4 pt-8">
+          <Link href="/borrower/credits">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />Back to Credits
             </Button>
           </Link>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Repay Credit
-            </h1>
-            <p className="text-muted-foreground">Complete your payment to {creditEntry.store_owner_name}</p>
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              This credit was <strong>{credit.status}</strong> and cannot be repaid.
+              {credit.rejection_reason && ` Reason: ${credit.rejection_reason}`}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ── Pending approval ──────────────────────────────────────────────────────
+  if (credit.status === 'pending_approval') {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="max-w-2xl mx-auto space-y-4 pt-8">
+          <Link href="/borrower/credits">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />Back to Credits
+            </Button>
+          </Link>
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              This credit is still <strong>pending your approval</strong>. Accept it first before making a repayment.
+            </AlertDescription>
+          </Alert>
+          <Link href="/borrower/credits">
+            <Button>Go to Pending Credits</Button>
+          </Link>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ── Active / Overdue — show repayment UI ──────────────────────────────────
+  return (
+    <DashboardLayout userType="borrower">
+      <div className="max-w-2xl mx-auto space-y-6">
+
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Link href="/borrower/credits">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />Back to Credits
+            </Button>
+          </Link>
         </div>
 
-        {/* Credit Details Card */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Repay Credit</h1>
+          <p className="text-muted-foreground mt-1">Complete your payment to {storeName}</p>
+        </div>
+
+        {/* Status alert for overdue */}
+        {credit.status === 'overdue' && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              This credit is <strong>overdue</strong>. {daysInfo && daysInfo.text}. Please repay as soon as possible to avoid further reputation impact.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Credit Details */}
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle>Credit Details</CardTitle>
-            <CardDescription>Review the credit information</CardDescription>
+            <CardDescription>Review before paying</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">Store Owner</span>
-              <span className="font-medium">{creditEntry.store_owner_name}</span>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between items-center py-1.5 border-b">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Store className="h-3.5 w-3.5" />Store
+              </span>
+              <span className="font-medium">{storeName}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">Credit Amount</span>
-              <span className="font-bold text-xl">{formatAmount(amountInPaise)}</span>
+
+            <div className="flex justify-between items-center py-1.5 border-b">
+              <span className="text-muted-foreground">Amount Due</span>
+              <span className="font-bold text-xl">{formatNPR(credit.credit_amount)}</span>
             </div>
-            {creditEntry.description && (
-              <div className="flex justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">Description</span>
-                <span className="font-medium text-right">{creditEntry.description}</span>
+
+            {credit.description && (
+              <div className="flex justify-between items-start py-1.5 border-b gap-4">
+                <span className="text-muted-foreground shrink-0">Description</span>
+                <span className="font-medium text-right">{credit.description}</span>
               </div>
             )}
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">Issued On</span>
-              <span className="font-medium">{formatDate(creditEntry.created_at)}</span>
+
+            <div className="flex justify-between items-center py-1.5 border-b">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />Issued
+              </span>
+              <span>{formatDateNP(credit.created_at)}</span>
             </div>
-            {creditEntry.due_date && (
-              <div className="flex justify-between py-2 border-b border-border">
-                <span className="text-muted-foreground">Due Date</span>
-                <span className="font-medium">{formatDate(creditEntry.due_date)}</span>
+
+            {credit.due_date && (
+              <div className="flex justify-between items-center py-1.5 border-b">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />Due Date
+                </span>
+                <div className="text-right">
+                  <span>{formatDateNP(credit.due_date)}</span>
+                  {daysInfo && (
+                    <p className={`text-xs ${daysInfo.color}`}>{daysInfo.text}</p>
+                  )}
+                </div>
               </div>
             )}
-            <div className="flex justify-between py-2">
+
+            <div className="flex justify-between items-center py-1.5">
               <span className="text-muted-foreground">Status</span>
-              <Badge variant={creditEntry.is_repaid ? 'secondary' : 'destructive'}>
-                {creditEntry.is_repaid ? 'Paid' : 'Outstanding'}
+              <Badge variant={credit.status === 'overdue' ? 'destructive' : 'default'} className="capitalize">
+                {credit.status}
               </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Payment Method Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Payment Method</CardTitle>
-            <CardDescription>
-              Choose how you want to repay this credit
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}>
-              <div className="flex items-center space-x-3 border border-border p-4 rounded-lg hover:bg-accent cursor-pointer">
-                <RadioGroupItem value="stripe" id="stripe" />
-                <Label htmlFor="stripe" className="flex-1 cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-chart-1/10 rounded-lg">
-                      <CreditCard className="h-5 w-5 text-chart-1" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">Pay with Stripe</p>
-                      <p className="text-sm text-muted-foreground">
-                        Credit/Debit Card, UPI, Net Banking
-                      </p>
-                    </div>
-                  </div>
-                </Label>
+        {/* Payment section */}
+        {!showCheckout ? (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Pay via Stripe</CardTitle>
+              <CardDescription>Credit/Debit card, UPI or Net Banking</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg bg-muted/50 border p-4 flex justify-between items-center">
+                <span className="text-muted-foreground text-sm">Total to pay</span>
+                <span className="text-xl font-bold">{formatNPR(credit.credit_amount)}</span>
               </div>
-
-              <div className="flex items-center space-x-3 border border-border p-4 rounded-lg hover:bg-accent cursor-pointer">
-                <RadioGroupItem value="tokens" id="tokens" />
-                <Label htmlFor="tokens" className="flex-1 cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-chart-2/10 rounded-lg">
-                      <Wallet className="h-5 w-5 text-chart-2" />
-                    </div>
-                    <div>
-                      <p className="font-semibold">Pay with Crypto</p>
-                      <p className="text-sm text-muted-foreground">
-                        Pay using Solana tokens from your wallet
-                      </p>
-                    </div>
-                  </div>
-                </Label>
-              </div>
-            </RadioGroup>
-
-            {!stripeAvailable && paymentMethod === 'stripe' && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  This store owner hasn't set up Stripe payments yet. Please use crypto payment or contact them.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Button 
-              onClick={handlePayment} 
-              className="w-full" 
-              size="lg"
-              disabled={processingPayment || (paymentMethod === 'stripe' && !stripeAvailable)}
-            >
-              {processingPayment ? (
-                <>
-                  <Spinner className="mr-2 h-4 w-4" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  Proceed to Payment
-                  {paymentMethod === 'stripe' ? (
-                    <CreditCard className="ml-2 h-4 w-4" />
-                  ) : (
-                    <Wallet className="ml-2 h-4 w-4" />
-                  )}
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Payment Instructions */}
-        {paymentMethod === 'tokens' && (
-          <Alert>
-            <Wallet className="h-4 w-4" />
-            <AlertDescription>
-              You'll be prompted to approve the transaction in your wallet. Make sure you have sufficient SOL balance for the transaction.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {showCheckout && paymentMethod === 'stripe' && (
+              <Button
+                className="w-full gap-2"
+                size="lg"
+                onClick={() => setShowCheckout(true)}
+              >
+                <CreditCard className="h-4 w-4" />
+                Proceed to Payment
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
           <Card>
             <CardHeader>
               <CardTitle>Complete Payment</CardTitle>
-              <CardDescription>Enter your payment details</CardDescription>
+              <CardDescription>Enter your card details below</CardDescription>
             </CardHeader>
             <CardContent>
-              <StripeCheckoutForm 
-                creditEntryId={creditEntry.id}
-                amount={amountInPaise}
+              <StripeCheckoutForm
+                creditEntryId={credit.id}
+                amount={credit.credit_amount}
                 currency="INR"
               />
             </CardContent>
           </Card>
         )}
 
-        {/* Security Notice */}
-        <Card className="bg-muted/50">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-chart-2 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Secure Payment</p>
-                <p className="text-sm text-muted-foreground">
-                  Your payment is secured with industry-standard encryption. 
-                  {paymentMethod === 'stripe' && ' Card details are never stored on our servers.'}
-                  {paymentMethod === 'tokens' && ' Transaction is recorded on Solana blockchain.'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Security notice */}
+        <div className="flex items-start gap-3 text-sm text-muted-foreground px-1">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+          <p>Your payment is secured with industry-standard encryption. Card details are never stored on our servers.</p>
+        </div>
+
       </div>
     </DashboardLayout>
-  )
+  );
 }

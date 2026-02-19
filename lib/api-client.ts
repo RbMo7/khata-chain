@@ -226,6 +226,9 @@ export const creditApi = {
   
   updateStatus: (id: string, status: string) =>
     patch(`/api/credits/${id}/status`, { status }),
+
+  markPaidCash: (id: string) =>
+    post(`/api/credits/${id}/mark-paid`, {}),
 };
 
 /**

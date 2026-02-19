@@ -178,14 +178,16 @@ export async function getStoreOwnerStats(pubkey: string) {
 
     const totalLent = creditData?.reduce((sum, entry) => sum + entry.credit_amount, 0) || 0
 
-    // Get total amount collected
+    // Get total amount collected — sum credit_amount for all fully paid credits
+    // (covers both cash payments and Stripe payments)
     const { data: collectedData } = await supabaseAdmin
       .from('credit_entries')
-      .select('stripe_repayment_amount')
+      .select('credit_amount')
       .eq('store_owner_pubkey', pubkey)
+      .eq('repayment_status', 'completed')
 
     const totalCollected =
-      collectedData?.reduce((sum, entry) => sum + entry.stripe_repayment_amount, 0) || 0
+      collectedData?.reduce((sum, entry) => sum + entry.credit_amount, 0) || 0
 
     // Get outstanding amount
     const { data: outstandingData } = await supabaseAdmin
@@ -207,6 +209,17 @@ export async function getStoreOwnerStats(pubkey: string) {
       .eq('store_owner_pubkey', pubkey)
       .eq('status', 'overdue')
 
+    // Get active borrowers — unique borrowers with active or overdue credits
+    const { data: activeBorrowersData } = await supabaseAdmin
+      .from('credit_entries')
+      .select('borrower_pubkey')
+      .eq('store_owner_pubkey', pubkey)
+      .in('status', ['active', 'overdue'])
+
+    const activeBorrowers = new Set(
+      activeBorrowersData?.map((r) => r.borrower_pubkey) ?? []
+    ).size
+
     // Get Stripe account status
     const { data: stripeAccount } = await supabaseAdmin
       .from('store_owner_stripe_accounts')
@@ -217,6 +230,7 @@ export async function getStoreOwnerStats(pubkey: string) {
     return {
       totalCreditsIssued: totalCreditsIssued || 0,
       activeCredits: activeCredits || 0,
+      activeBorrowers,
       overdueCredits: overdueCredits || 0,
       totalLent,
       totalCollected,
@@ -231,6 +245,7 @@ export async function getStoreOwnerStats(pubkey: string) {
     return {
       totalCreditsIssued: 0,
       activeCredits: 0,
+      activeBorrowers: 0,
       overdueCredits: 0,
       totalLent: 0,
       totalCollected: 0,
