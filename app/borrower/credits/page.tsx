@@ -4,48 +4,28 @@ import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowUpRight } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ArrowUpRight, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { formatNPR, formatDateNP } from '@/lib/currency-utils'
+import { useApi } from '@/hooks/use-api'
+import { borrowerApi } from '@/lib/api-client'
 
 export default function BorrowerCredits() {
-  // Mock data
-  const activeCredits = [
-    {
-      id: '1',
-      storeName: 'Sharma Kirana Store',
-      amount: 15000,
-      dueDate: '2026-03-15',
-      status: 'active' as const,
-      description: 'Grocery supplies and household items'
-    },
-    {
-      id: '2',
-      storeName: 'Patel General Store',
-      amount: 20000,
-      dueDate: '2026-03-20',
-      status: 'active' as const,
-      description: 'Monthly supplies'
-    },
-    {
-      id: '3',
-      storeName: 'Khan Electronics',
-      amount: 10000,
-      dueDate: '2026-03-10',
-      status: 'overdue' as const,
-      description: 'Electronics purchase'
-    }
-  ]
+  // Fetch active credits from API
+  const { data: creditsData, loading, error } = useApi(
+    () => borrowerApi.getCredits('active'),
+    []
+  )
+
+  const activeCredits = creditsData?.data?.credits || []
 
   const formatAmount = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN')}`
+    return formatNPR(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
+    return formatDateNP(dateString)
   }
 
   const getDaysUntilDue = (dueDateString: string) => {
@@ -60,7 +40,30 @@ export default function BorrowerCredits() {
     return status === 'overdue' ? 'destructive' : 'default'
   }
 
-  const totalOutstanding = activeCredits.reduce((sum, credit) => sum + credit.amount, 0)
+  const totalOutstanding = activeCredits.reduce((sum: number, credit: any) => sum + credit.credit_amount, 0)
+
+  if (loading) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout userType="borrower">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load credits. Please try refreshing the page.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout userType="borrower">
@@ -92,58 +95,71 @@ export default function BorrowerCredits() {
         </Card>
 
         <div className="space-y-4">
-          {activeCredits.map((credit) => {
-            const daysUntilDue = getDaysUntilDue(credit.dueDate)
-            const isOverdue = daysUntilDue < 0
+          {activeCredits.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <p className="text-lg font-medium">No active credits</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    You don't have any active credits at the moment
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            activeCredits.map((credit: any) => {
+              const daysUntilDue = getDaysUntilDue(credit.due_date)
+              const isOverdue = daysUntilDue < 0
 
-            return (
-              <Card key={credit.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{credit.storeName}</CardTitle>
-                      <CardDescription className="mt-1">
-                        {credit.description}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={getStatusColor(credit.status)}>
-                      {credit.status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
-                    <div className="space-y-2">
+              return (
+                <Card key={credit.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
                       <div>
-                        <div className="text-2xl font-bold">
-                          {formatAmount(credit.amount)}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Due {formatDate(credit.dueDate)}
-                          {isOverdue && (
-                            <span className="text-destructive ml-1">
-                              (Overdue by {Math.abs(daysUntilDue)} days)
-                            </span>
-                          )}
-                          {!isOverdue && (
-                            <span className="ml-1">
-                              (in {daysUntilDue} days)
-                            </span>
-                          )}
+                        <CardTitle>{credit.store_owner?.store_name || 'Store'}</CardTitle>
+                        <CardDescription className="mt-1">
+                          {credit.description || 'No description'}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={getStatusColor(credit.status)}>
+                        {credit.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+                      <div className="space-y-2">
+                        <div>
+                          <div className="text-2xl font-bold">
+                            {formatAmount(credit.credit_amount)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Due {formatDate(credit.due_date)}
+                            {isOverdue && (
+                              <span className="text-destructive ml-1">
+                                (Overdue by {Math.abs(daysUntilDue)} days)
+                              </span>
+                            )}
+                            {!isOverdue && (
+                              <span className="ml-1">
+                                (in {daysUntilDue} days)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      <Link href={`/borrower/repay?credit_entry_id=${credit.id}`}>
+                        <Button>
+                          Repay Now
+                          <ArrowUpRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </Link>
                     </div>
-                    <Link href={`/borrower/repay?credit_entry_id=${credit.id}`}>
-                      <Button>
-                        Repay Now
-                        <ArrowUpRight className="ml-2 h-4 w-4" />
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+                  </CardContent>
+                </Card>
+              )
+            })
+          )}
         </div>
       </div>
     </DashboardLayout>

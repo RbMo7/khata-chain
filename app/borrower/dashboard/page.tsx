@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   CreditCard, 
   TrendingUp, 
@@ -14,84 +15,37 @@ import {
   AlertCircle,
   ArrowUpRight,
   Wallet,
-  ShieldCheck
+  ShieldCheck,
+  Loader2
 } from 'lucide-react'
 import Link from 'next/link'
+import { formatNPR, formatDateNP } from '@/lib/currency-utils'
+import { useApi } from '@/hooks/use-api'
+import { borrowerApi } from '@/lib/api-client'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function BorrowerDashboard() {
-  // Mock data - replace with real API calls
-  const stats = {
-    totalCredit: 45000, // in paise
-    activeCredits: 3,
-    creditsPaid: 12,
-    reputationScore: 850,
-    citizenshipVerified: true
-  }
+  const { user } = useAuth()
+  
+  // Fetch real data from API
+  const { data: stats, loading: statsLoading, error: statsError } = useApi(
+    () => borrowerApi.getStats(),
+    []
+  )
 
-  const activeCredits = [
-    {
-      id: '1',
-      storeName: 'Sharma Kirana Store',
-      amount: 15000,
-      dueDate: '2026-03-15',
-      currency: 'INR',
-      status: 'active' as const
-    },
-    {
-      id: '2',
-      storeName: 'Patel General Store',
-      amount: 20000,
-      dueDate: '2026-03-20',
-      currency: 'INR',
-      status: 'active' as const
-    },
-    {
-      id: '3',
-      storeName: 'Khan Electronics',
-      amount: 10000,
-      dueDate: '2026-03-10',
-      currency: 'INR',
-      status: 'overdue' as const
-    }
-  ]
+  const { data: creditsData, loading: creditsLoading, error: creditsError } = useApi(
+    () => borrowerApi.getCredits(),
+    []
+  )
 
-  const recentTransactions = [
-    {
-      id: '1',
-      type: 'repayment' as const,
-      storeName: 'Singh Hardware',
-      amount: 5000,
-      date: '2026-02-18',
-      method: 'stripe' as const
-    },
-    {
-      id: '2',
-      type: 'credit' as const,
-      storeName: 'Kumar Textiles',
-      amount: 12000,
-      date: '2026-02-15',
-      method: 'on_chain' as const
-    },
-    {
-      id: '3',
-      type: 'repayment' as const,
-      storeName: 'Verma Groceries',
-      amount: 8000,
-      date: '2026-02-10',
-      method: 'on_chain' as const
-    }
-  ]
+  const activeCredits = creditsData?.data?.credits || []
 
   const formatAmount = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN')}`
+    return formatNPR(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
+    return formatDateNP(dateString)
   }
 
   const getStatusColor = (status: string) => {
@@ -115,18 +69,51 @@ export default function BorrowerDashboard() {
     return diffDays
   }
 
+  // Loading state
+  if (statsLoading || creditsLoading) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground">Loading dashboard...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Error state
+  if (statsError || creditsError) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="space-y-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {statsError || creditsError || 'Failed to load dashboard data. Please try again.'}
+            </AlertDescription>
+          </Alert>
+          <Button onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout userType="borrower">
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back!</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back{user?.name ? `, ${user.name}` : ''}!</h1>
             <p className="text-muted-foreground mt-1">
               Here's your credit overview and activity
             </p>
           </div>
-          {!stats.citizenshipVerified && (
+          {!user?.citizenshipVerified && (
             <Link href="/borrower/verify">
               <Button variant="outline" className="border-chart-2">
                 <ShieldCheck className="mr-2 h-4 w-4" />
@@ -146,9 +133,9 @@ export default function BorrowerDashboard() {
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatAmount(stats.totalCredit)}</div>
+              <div className="text-2xl font-bold">{formatAmount(stats?.data?.totalOwed || 0)}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Across {stats.activeCredits} entries
+                Across {stats?.data?.activeCreditsCount || 0} entries
               </p>
             </CardContent>
           </Card>
@@ -156,15 +143,14 @@ export default function BorrowerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Reputation Score
+                Total Credits
               </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.reputationScore}</div>
-              <Progress value={(stats.reputationScore / 1000) * 100} className="mt-2" />
+              <div className="text-2xl font-bold">{stats?.data?.totalCredits || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Excellent standing
+                Lifetime credits
               </p>
             </CardContent>
           </Card>
@@ -177,7 +163,7 @@ export default function BorrowerDashboard() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.activeCredits}</div>
+              <div className="text-2xl font-bold">{stats?.data?.activeCreditsCount || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Need attention
               </p>
@@ -187,12 +173,12 @@ export default function BorrowerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Credits Paid
+                Completed Payments
               </CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.creditsPaid}</div>
+              <div className="text-2xl font-bold">{stats?.data?.completedPaymentsCount || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Lifetime total
               </p>
@@ -203,8 +189,7 @@ export default function BorrowerDashboard() {
         {/* Main Content Tabs */}
         <Tabs defaultValue="active" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="active">Active Credits</TabsTrigger>
-            <TabsTrigger value="history">Recent Activity</TabsTrigger>
+            <TabsTrigger value="active">Active Credits ({activeCredits.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="active" className="space-y-4">
@@ -217,8 +202,8 @@ export default function BorrowerDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {activeCredits.map((credit) => {
-                    const daysUntilDue = getDaysUntilDue(credit.dueDate)
+                  {activeCredits.map((credit: any) => {
+                    const daysUntilDue = getDaysUntilDue(credit.due_date)
                     const isOverdue = daysUntilDue < 0
 
                     return (
@@ -228,13 +213,13 @@ export default function BorrowerDashboard() {
                       >
                         <div className="flex-1 mb-3 sm:mb-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold">{credit.storeName}</h3>
+                            <h3 className="font-semibold">{credit.store_owner?.store_name || 'Store'}</h3>
                             <Badge variant={getStatusColor(credit.status)}>
                               {credit.status}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            Due {formatDate(credit.dueDate)}
+                            Due {formatDate(credit.due_date)}
                             {isOverdue ? (
                               <span className="text-destructive ml-1">
                                 (Overdue by {Math.abs(daysUntilDue)} days)
@@ -249,10 +234,10 @@ export default function BorrowerDashboard() {
                         <div className="flex items-center gap-4">
                           <div className="text-right">
                             <div className="text-lg font-bold">
-                              {formatAmount(credit.amount)}
+                              {formatAmount(credit.credit_amount)}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {credit.currency}
+                              {credit.currency || 'NPR'}
                             </div>
                           </div>
                           <Link href={`/borrower/repay?credit_entry_id=${credit.id}`}>
@@ -279,68 +264,10 @@ export default function BorrowerDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          <TabsContent value="history" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>
-                  Your latest transactions and credit entries
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentTransactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center justify-between p-3 border border-border rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${
-                          transaction.type === 'repayment' 
-                            ? 'bg-chart-2/10' 
-                            : 'bg-chart-1/10'
-                        }`}>
-                          {transaction.type === 'repayment' ? (
-                            <CheckCircle className="h-4 w-4 text-chart-2" />
-                          ) : (
-                            <Wallet className="h-4 w-4 text-chart-1" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {transaction.type === 'repayment' ? 'Repaid to' : 'Credit from'}{' '}
-                            {transaction.storeName}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(transaction.date)} • {transaction.method === 'stripe' ? 'Stripe' : 'On-chain'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className={`font-semibold ${
-                        transaction.type === 'repayment' 
-                          ? 'text-chart-2' 
-                          : 'text-chart-1'
-                      }`}>
-                        {transaction.type === 'repayment' ? '-' : '+'}
-                        {formatAmount(transaction.amount)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <Link href="/borrower/history">
-                  <Button variant="outline" className="w-full mt-4">
-                    View All History
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
 
         {/* Citizenship Verification Banner */}
-        {!stats.citizenshipVerified && (
+        {!user?.citizenshipVerified && (
           <Card className="border-chart-2/50 bg-chart-2/5">
             <CardHeader>
               <div className="flex items-start gap-4">

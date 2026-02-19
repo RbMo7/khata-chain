@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { authApi } from '@/lib/api-client'
 
 export type UserType = 'borrower' | 'store-owner' | null
 
@@ -9,18 +10,20 @@ interface User {
   walletType: string
   userType: UserType
   citizenshipVerified: boolean
-  name?: string
-  email?: string
+  name?: string | null
+  email?: string | null
+  id?: string | null
 }
 
 interface AuthContextType {
   user: User | null
   isConnecting: boolean
   isAuthenticated: boolean
-  connectWallet: (address: string, walletType: string) => void
+  connectWallet: (address: string, walletType: string, userType: UserType, name?: string, email?: string) => Promise<void>
   disconnectWallet: () => void
-  setUserType: (type: UserType) => void
+  setUserType: (type: UserType) => Promise<void>
   updateUser: (updates: Partial<User>) => void
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -30,20 +33,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load user from localStorage on mount
+  // Load user from localStorage and verify with API on mount
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const stored = localStorage.getItem('khatachain_user')
-        if (stored) {
-          const userData = JSON.parse(stored)
-          setUser(userData)
+        const savedUser = localStorage.getItem('khatachain_user')
+        
+        if (savedUser) {
+          const parsedUser = JSON.parse(savedUser)
           
-          // Try to reconnect to wallet
-          await reconnectWallet(userData.walletType)
+          // Only load if user has an ID (fully authenticated)
+          if (parsedUser.id && parsedUser.walletAddress) {
+            setUser(parsedUser)
+            
+            // Try to reconnect to wallet silently
+            try {
+              await reconnectWallet(parsedUser.walletType)
+            } catch (error) {
+              console.log('Could not reconnect wallet (this is normal)')
+            }
+            
+            // Try to refresh user data from API (optional)
+            try {
+              await refreshUserData()
+            } catch (error) {
+              // Refresh failed but user is still valid from localStorage
+              console.log('Could not refresh user data (continuing with cached data)')
+            }
+          } else {
+            // Remove incomplete user data
+            console.log('Removing incomplete user data from localStorage')
+            localStorage.removeItem('khatachain_user')
+          }
         }
       } catch (error) {
-        console.error('Failed to load user:', error)
+        console.error('Failed to load user from localStorage:', error)
         localStorage.removeItem('khatachain_user')
       } finally {
         setIsLoading(false)
@@ -75,39 +99,122 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const windowKey = walletKeyMap[walletType] || walletType.toLowerCase()
       const walletObj = (window as any)[windowKey]
       
-      if (walletObj && walletObj.isConnected) {
-        // Wallet is still connected, no action needed
+      if (!walletObj) {
+        console.log('Wallet not found:', walletType)
+        return false
+      }
+
+      if (walletObj.isConnected) {
+        // Wallet is still connected
+        console.log('Wallet already connected:', walletType)
         return true
-      } else if (walletObj) {
-        // Try silent reconnect
+      }
+      
+      // Try silent reconnect with onlyIfTrusted flag
+      try {
         await walletObj.connect({ onlyIfTrusted: true })
+        console.log('Wallet reconnected silently:', walletType)
         return true
+      } catch (err) {
+        // Silent reconnect failed - user needs to explicitly connect
+        console.log('Silent reconnect failed for:', walletType)
+        return false
       }
     } catch (error) {
       console.log('Could not reconnect wallet:', error)
+      return false
     }
-    return false
   }
 
-  const connectWallet = async (address: string, walletType: string) => {
+  const refreshUserData = async () => {
+    if (!user || !user.id) {
+      console.log('No user to refresh')
+      return
+    }
+    
+    try {
+      console.log('Refreshing user data...')
+      const response = await authApi.getCurrentUser()
+      
+      if (!response) {
+        console.warn('No response from refresh API')
+        return
+      }
+      
+      if (response.success && response.data) {
+        const apiUser = response.data
+        const refreshedUser = {
+          walletAddress: apiUser.walletAddress,
+          walletType: user.walletType, // Keep existing wallet type
+          userType: apiUser.userType,
+          citizenshipVerified: apiUser.citizenshipVerified || false,
+          name: apiUser.name,
+          email: apiUser.email,
+          id: apiUser.id,
+        }
+        setUser(refreshedUser)
+        console.log('User data refreshed successfully')
+      } else {
+        console.warn('Refresh API returned unsuccessful response:', response)
+      }
+    } catch (error) {
+      console.warn('Failed to refresh user data:', error)
+      // Don't throw - user data from localStorage is still valid
+    }
+  }
+
+  const connectWallet = async (address: string, walletType: string, userType: UserType, name?: string, email?: string) => {
     setIsConnecting(true)
     
     try {
-      // Check if user exists in the database
-      // For now, we'll create a new user object
-      // In production, this should fetch from the API
-      
-      const newUser: User = {
-        walletAddress: address,
-        walletType,
-        userType: null, // Will be set after user selects their role
-        citizenshipVerified: false,
+      if (!address) {
+        throw new Error('Wallet address is required')
       }
       
+      if (!userType) {
+        throw new Error('User type is required')
+      }
+
+      console.log('Authenticating user:', { address, walletType, userType, name, email })
+      
+      // Call login API to create/authenticate user
+      const response = await authApi.login(address, userType, name, email)
+      console.log('Login API response:', response)
+      
+      if (!response || !response.success) {
+        throw new Error(response?.error || 'Authentication failed')
+      }
+      
+      if (!response.data || !response.data.user) {
+        throw new Error('No user data in response')
+      }
+      
+      const apiUser = response.data.user
+      const newUser: User = {
+        walletAddress: apiUser.walletAddress,
+        walletType: walletType,
+        userType: apiUser.userType,
+        citizenshipVerified: apiUser.citizenshipVerified || false,
+        name: apiUser.name,
+        email: apiUser.email,
+        id: apiUser.id,
+      }
+      
+      // Save to localStorage immediately before setting state
+      // This ensures auth token is available for subsequent API calls
+      localStorage.setItem('khatachain_user', JSON.stringify(newUser))
+      
       setUser(newUser)
-    } catch (error) {
-      console.error('Failed to connect wallet:', error)
-      throw error
+      console.log('User authenticated successfully:', newUser)
+    } catch (error: any) {
+      console.error('Failed to authenticate:', error)
+      
+      // Clear any partial state
+      setUser(null)
+      
+      // Re-throw with a clear message
+      const errorMessage = error?.message || error?.toString() || 'Failed to authenticate'
+      throw new Error(errorMessage)
     } finally {
       setIsConnecting(false)
     }
@@ -134,13 +241,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
-  const setUserType = (type: UserType) => {
-    if (!user) return
+  const setUserType = async (type: UserType) => {
+    if (!user || !user.walletAddress) {
+      throw new Error('No wallet connected')
+    }
     
-    setUser({
-      ...user,
-      userType: type,
-    })
+    if (!type) {
+      throw new Error('User type is required')
+    }
+    
+    try {
+      console.log('Setting user type:', { type, walletAddress: user.walletAddress })
+      
+      // Call login API to create/authenticate user
+      const response = await authApi.login(user.walletAddress, type)
+      console.log('Login API response:', response)
+      
+      if (!response) {
+        throw new Error('No response from server')
+      }
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Authentication failed')
+      }
+      
+      if (!response.data || !response.data.user) {
+        throw new Error('No user data in response')
+      }
+      
+      const apiUser = response.data.user
+      console.log('API user data:', apiUser)
+      
+      const updatedUser: User = {
+        walletAddress: apiUser.walletAddress,
+        walletType: user.walletType,
+        userType: apiUser.userType,
+        citizenshipVerified: apiUser.citizenshipVerified || false,
+        name: apiUser.name,
+        email: apiUser.email,
+        id: apiUser.id,
+      }
+      
+      // Save to localStorage immediately before setting state
+      localStorage.setItem('khatachain_user', JSON.stringify(updatedUser))
+      
+      setUser(updatedUser)
+      console.log('User authenticated successfully:', updatedUser)
+    } catch (error: any) {
+      console.error('Failed to set user type:', error)
+      throw error
+    }
   }
 
   const updateUser = (updates: Partial<User>) => {
@@ -152,6 +302,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  const refreshUser = async () => {
+    await refreshUserData()
+  }
+
   const value: AuthContextType = {
     user,
     isConnecting,
@@ -160,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     disconnectWallet,
     setUserType,
     updateUser,
+    refreshUser,
   }
 
   if (isLoading) {

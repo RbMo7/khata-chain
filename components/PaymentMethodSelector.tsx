@@ -3,6 +3,7 @@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { formatNPR } from '@/lib/currency-utils';
 
 type PaymentMethod = 'tokens' | 'stripe' | 'hybrid';
 
@@ -96,10 +97,10 @@ export function PaymentMethodSelector({
             {stripeAvailable && (
               <div className="text-sm mt-2 space-y-1">
                 <p>
-                  Amount: <span className="font-semibold">₹{(creditAmount / 100).toFixed(2)}</span>
+                  Amount: <span className="font-semibold">{formatNPR(creditAmount)}</span>
                 </p>
                 <p>
-                  Fee: <span className="text-orange-600">₹{(stripeFee / 100).toFixed(2)} ({stripeFeePercentage}%)</span>
+                  Fee: <span className="text-orange-600">{formatNPR(stripeFee)} ({stripeFeePercentage}%)</span>
                 </p>
               </div>
             )}

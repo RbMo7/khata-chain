@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
+import { PendingCreditRequests } from '@/components/PendingCreditRequests'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,6 +78,9 @@ export default function BorrowerProfile() {
   return (
     <DashboardLayout userType="borrower">
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Pending Credit Requests - Display First */}
+        <PendingCreditRequests />
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>

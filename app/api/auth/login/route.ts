@@ -17,7 +17,7 @@ import { successResponse, errorResponse } from '@/lib/middleware/auth.middleware
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { walletAddress, userType, email } = body
+    const { walletAddress, userType, name, email } = body
 
     // Validate required fields
     if (!walletAddress) {
@@ -33,10 +33,16 @@ export async function POST(req: NextRequest) {
 
     // If user doesn't exist, create them
     if (!user) {
+      // For new users, name is required
+      if (!name || !name.trim()) {
+        return errorResponse('name is required for new users', 400)
+      }
+      
       user = await getOrCreateUser(
         walletAddress,
         userType,
-        email || `${walletAddress.slice(0, 8)}@khatachain.com`
+        email && email.trim() ? email : `${walletAddress.slice(0, 8)}@khatachain.com`,
+        name.trim()
       )
     }
 

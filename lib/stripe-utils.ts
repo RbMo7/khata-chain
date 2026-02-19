@@ -93,7 +93,7 @@ export async function getStripeAccountStatus(
  * Create a payment intent for a borrower to repay a credit entry
  */
 export async function createPaymentIntent(
-  amount: number, // in smallest currency unit (paise for INR)
+  amount: number, // in smallest currency unit (paisa for NPR)
   currency: string,
   storeOwnerStripeId: string,
   borrowerWalletAddress: string,
@@ -266,7 +266,7 @@ export async function getAccountBalance(
 
     const available = balance.available[0]?.amount || 0;
     const pending = balance.pending[0]?.amount || 0;
-    const currency = balance.available[0]?.currency || 'inr';
+    const currency = balance.available[0]?.currency || 'npr';
 
     return {
       available,
@@ -278,7 +278,7 @@ export async function getAccountBalance(
     return {
       available: 0,
       pending: 0,
-      currency: 'INR',
+      currency: 'NPR',
       error: err.message,
     };
   }

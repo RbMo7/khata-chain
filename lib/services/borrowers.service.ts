@@ -164,13 +164,20 @@ export async function updateCitizenshipVerification(
 /**
  * Search borrowers by name or email
  */
-export async function searchBorrowers(query: string): Promise<Borrower[]> {
+export async function searchBorrowers(query: string, limit: number = 10): Promise<Borrower[]> {
   try {
-    const { data, error } = await supabaseAdmin
+    let queryBuilder = supabaseAdmin
       .from('borrowers')
       .select('*')
-      .or(`full_name.ilike.%${query}%,email.ilike.%${query}%,display_name.ilike.%${query}%`)
-      .limit(10)
+      .limit(limit)
+      .order('created_at', { ascending: false })
+    
+    // If query is provided, filter by name/email
+    if (query && query.trim()) {
+      queryBuilder = queryBuilder.or(`full_name.ilike.%${query}%,email.ilike.%${query}%,display_name.ilike.%${query}%`)
+    }
+    
+    const { data, error } = await queryBuilder
 
     if (error) {
       console.error('Search borrowers error:', error)

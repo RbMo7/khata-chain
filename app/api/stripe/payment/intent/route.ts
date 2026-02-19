@@ -114,4 +114,3 @@ async function handler(request: NextRequest) {
 }
 
 export const POST = withAuth(handler, 'borrower')
-}

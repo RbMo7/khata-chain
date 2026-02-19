@@ -148,16 +148,23 @@ export async function updateCreditEntry(
 }
 
 /**
- * Update credit status (active, completed, overdue, cancelled)
+ * Update credit status (active, completed, overdue, cancelled, pending_approval, rejected)
  */
 export async function updateCreditStatus(
   id: string,
-  status: CreditEntry['status']
+  status: CreditEntry['status'],
+  additionalUpdates?: Partial<CreditEntry>
 ): Promise<CreditEntry | null> {
   try {
+    const updates = {
+      status,
+      updated_at: new Date().toISOString(),
+      ...additionalUpdates,
+    }
+
     const { data, error } = await supabaseAdmin
       .from('credit_entries')
-      .update({ status })
+      .update(updates)
       .eq('id', id)
       .select()
       .single()

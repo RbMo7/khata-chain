@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth, UserType } from '@/contexts/AuthContext'
 import { WalletConnectModal } from '@/components/WalletConnectModal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,8 +46,8 @@ export function Navbar() {
     setShowWalletModal(true)
   }
 
-  const handleWalletConnected = async (address: string, walletType: string) => {
-    await authConnectWallet(address, walletType)
+  const handleWalletConnected = async (address: string, walletType: string, userType: UserType) => {
+    await authConnectWallet(address, walletType, userType)
     router.push('/select-role')
   }
 
@@ -62,6 +62,7 @@ export function Navbar() {
         open={showWalletModal}
         onOpenChange={setShowWalletModal}
         onConnect={handleWalletConnected}
+        userType={user?.userType} // Pass user type to modal for better handling
       />
 
       <nav className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -88,7 +89,7 @@ export function Navbar() {
                 >
                   Dashboard
                 </Link>
-                {user.userType === 'borrower' && (
+                {user?.userType === 'borrower' && (
                   <>
                     <Link 
                       href="/borrower/credits"
@@ -108,7 +109,7 @@ export function Navbar() {
                     </Link>
                   </>
                 )}
-                {user.userType === 'store-owner' && (
+                {user?.userType === 'store-owner' && (
                   <>
                     <Link 
                       href="/store-owner/credits"
@@ -146,7 +147,7 @@ export function Navbar() {
                     <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
                       <Avatar className="h-9 w-9">
                         <AvatarFallback className="bg-primary/10 text-primary">
-                          {user?.userType === 'borrower' ? 'B' : 'S'}
+                          {user?.userType === 'borrower' ? 'B' : user?.userType === 'store-owner' ? 'S' : 'U'}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
@@ -205,7 +206,7 @@ export function Navbar() {
                 >
                   Dashboard
                 </Link>
-                {user.userType === 'borrower' && (
+                {user?.userType === 'borrower' && (
                   <>
                     <Link 
                       href="/borrower/credits"
@@ -223,7 +224,7 @@ export function Navbar() {
                     </Link>
                   </>
                 )}
-                {user.userType === 'store-owner' && (
+                {user?.userType === 'store-owner' && (
                   <>
                     <Link 
                       href="/store-owner/credits"

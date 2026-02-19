@@ -21,94 +21,100 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, CheckCircle, Search, AlertCircle, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
+import { formatNPR } from '@/lib/currency-utils'
+import { useApi, useMutation } from '@/hooks/use-api'
+import { searchApi, creditApi } from '@/lib/api-client'
 
 export default function CreateCreditPage() {
   const router = useRouter()
   const [step, setStep] = useState<'search' | 'verify' | 'details' | 'confirm'>('search')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
   // Form state
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searching, setSearching] = useState(false)
+  const [creatingCredit, setCreatingCredit] = useState(false)
   const [selectedBorrower, setSelectedBorrower] = useState<any>(null)
   const [creditAmount, setCreditAmount] = useState('')
-  const [currency, setCurrency] = useState('INR')
+  const [currency, setCurrency] = useState('NPR')
   const [description, setDescription] = useState('')
   const [dueDate, setDueDate] = useState<Date>()
   const [interestRate, setInterestRate] = useState('')
   const [collateral, setCollateral] = useState('')
 
-  // Mock borrowers data
-  const mockBorrowers = [
-    { 
-      id: '1', 
-      name: 'Rajesh Kumar', 
-      wallet: 'EqKx...XYZ1',
-      email: 'rajesh@example.com',
-      phone: '+91 98765 43210',
-      reputationScore: 850,
-      totalCredits: 5,
-      verified: true
-    },
-    { 
-      id: '2', 
-      name: 'Priya Sharma', 
-      wallet: 'Dy7M...ABC2',
-      email: 'priya@example.com',
-      phone: '+91 98765 43211',
-      reputationScore: 920,
-      totalCredits: 12,
-      verified: true
-    },
-    { 
-      id: '3', 
-      name: 'Amit Patel', 
-      wallet: 'F8nP...DEF3',
-      email: 'amit@example.com',
-      phone: '+91 98765 43212',
-      reputationScore: 780,
-      totalCredits: 3,
-      verified: false
-    }
-  ]
+  // Fetch recent borrowers (we'll use a default query)
+  const { data: recentBorrowersData } = useApi(
+    () => searchApi.borrowers(''),
+    []
+  )
 
-  const handleSearchBorrower = () => {
-    setLoading(true)
-    setError(null)
+  const recentBorrowers = recentBorrowersData?.data?.results || []
+
+  const handleSearchBorrower = async () => {
+    setSearching(true)
     
-    // Simulate API call
-    setTimeout(() => {
-      const found = mockBorrowers.find(
-        b => b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             b.wallet.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             b.email.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+    if (!searchQuery.trim()) {
+      setError('Please enter a search query')
+      setSearching(false)
+      return
+    }
+    
+    try {
+      const result = await searchApi.borrowers(searchQuery)
       
-      if (found) {
-        setSelectedBorrower(found)
-        setStep('verify')
+      if (result.data?.results && result.data.results.length > 0) {
+        setSearchResults(result.data.results)
+        if (result.data.results.length === 1) {
+          setSelectedBorrower(result.data.results[0])
+          setStep('verify')
+        }
       } else {
         setError('Borrower not found. Please check the wallet address or email.')
       }
-      setLoading(false)
-    }, 1000)
+    } catch (err) {
+      setError('Failed to search for borrower. Please try again.')
+    } finally {
+      setSearching(false)
+    }
   }
 
-  const handleCreateCredit = () => {
-    setLoading(true)
+  const handleCreateCredit = async () => {
     setError(null)
+    setCreatingCredit(true)
     
-    // Simulate credit creation
-    setTimeout(() => {
+    if (!selectedBorrower || !creditAmount || !description || !dueDate) {
+      setError('Please fill in all required fields')
+      setCreatingCredit(false)
+      return
+    }
+
+    try {
+      // Convert amount to paisa (smallest unit)
+      const amountInPaisa = Math.round(parseFloat(creditAmount) * 100)
+      
+      const creditData = {
+        borrowerPubkey: selectedBorrower.borrower_pubkey,
+        creditAmount: amountInPaisa,
+        currency: currency,
+        description: description,
+        dueDate: dueDate.toISOString()
+      }
+      
+      await creditApi.create(creditData)
+      
       setSuccess(true)
-      setLoading(false)
       
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
         router.push('/store-owner/dashboard')
       }, 2000)
-    }, 1500)
+    } catch (err: any) {
+      setError(err.message || 'Failed to create credit entry. Please try again.')
+    } finally {
+      setCreatingCredit(false)
+    }
   }
 
   const getReputationColor = (score: number) => {
@@ -130,7 +136,7 @@ export default function CreateCreditPage() {
                 <div>
                   <h2 className="text-2xl font-bold">Credit Entry Created!</h2>
                   <p className="text-muted-foreground mt-2">
-                    Credit of ₹{parseFloat(creditAmount).toLocaleString('en-IN')} has been issued to {selectedBorrower?.name}
+                    Credit of {formatNPR(Math.round(parseFloat(creditAmount) * 100))} has been issued to {selectedBorrower?.full_name}
                   </p>
                 </div>
                 <div className="pt-4">
@@ -213,8 +219,8 @@ export default function CreateCreditPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchBorrower()}
                   />
-                  <Button onClick={handleSearchBorrower} disabled={loading || !searchQuery}>
-                    {loading ? (
+                  <Button onClick={handleSearchBorrower} disabled={searching || !searchQuery}>
+                    {searching ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <Search className="h-4 w-4" />
@@ -223,10 +229,39 @@ export default function CreateCreditPage() {
                 </div>
               </div>
 
+              {/* Search Results */}
+              {searchResults.length > 0 && (
+                <div className="pt-4">
+                  <p className="text-sm font-medium mb-3">Search Results</p>
+                  <div className="space-y-2">
+                    {searchResults.map((borrower: any) => (
+                      <button
+                        key={borrower.id}
+                        onClick={() => {
+                          setSelectedBorrower(borrower)
+                          setStep('verify')
+                        }}
+                        className="w-full text-left p-3 border border-border rounded-lg hover:bg-accent transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{borrower.full_name}</p>
+                            <p className="text-xs text-muted-foreground">{borrower.borrower_pubkey?.slice(0, 8)}...{borrower.borrower_pubkey?.slice(-8)}</p>
+                          </div>
+                          <Badge variant={borrower.citizenship_verified ? 'default' : 'secondary'}>
+                            {borrower.citizenship_verified ? 'Verified' : 'Unverified'}
+                          </Badge>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-4">
                 <p className="text-sm font-medium mb-3">Recent Borrowers</p>
                 <div className="space-y-2">
-                  {mockBorrowers.slice(0, 3).map((borrower) => (
+                  {recentBorrowers.slice(0, 3).map((borrower: any) => (
                     <button
                       key={borrower.id}
                       onClick={() => {
@@ -237,15 +272,20 @@ export default function CreateCreditPage() {
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{borrower.name}</p>
-                          <p className="text-xs text-muted-foreground">{borrower.wallet}</p>
+                          <p className="font-medium">{borrower.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{borrower.borrower_pubkey?.slice(0, 8)}...{borrower.borrower_pubkey?.slice(-8)}</p>
                         </div>
-                        <Badge variant={borrower.verified ? 'default' : 'secondary'}>
-                          {borrower.verified ? 'Verified' : 'Unverified'}
+                        <Badge variant={borrower.citizenship_verified ? 'default' : 'secondary'}>
+                          {borrower.citizenship_verified ? 'Verified' : 'Unverified'}
                         </Badge>
                       </div>
                     </button>
                   ))}
+                  {recentBorrowers.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No recent borrowers found
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -265,34 +305,34 @@ export default function CreateCreditPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Name</Label>
-                  <p className="font-semibold mt-1">{selectedBorrower.name}</p>
+                  <p className="font-semibold mt-1">{selectedBorrower.full_name}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Status</Label>
                   <div className="mt-1">
-                    <Badge variant={selectedBorrower.verified ? 'default' : 'secondary'}>
-                      {selectedBorrower.verified ? 'Verified' : 'Unverified'}
+                    <Badge variant={selectedBorrower.citizenship_verified ? 'default' : 'secondary'}>
+                      {selectedBorrower.citizenship_verified ? 'Verified' : 'Unverified'}
                     </Badge>
                   </div>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <Label className="text-muted-foreground">Wallet</Label>
-                  <p className="font-mono text-sm mt-1">{selectedBorrower.wallet}</p>
+                  <p className="font-mono text-sm mt-1 break-all">{selectedBorrower.borrower_pubkey}</p>
                 </div>
-                <div>
-                  <Label className="text-muted-foreground">Email</Label>
-                  <p className="text-sm mt-1">{selectedBorrower.email}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Phone</Label>
-                  <p className="text-sm mt-1">{selectedBorrower.phone}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Reputation Score</Label>
-                  <p className={`text-2xl font-bold mt-1 ${getReputationColor(selectedBorrower.reputationScore)}`}>
-                    {selectedBorrower.reputationScore}
-                  </p>
-                </div>
+                {selectedBorrower.email && (
+                  <div>
+                    <Label className="text-muted-foreground">Email</Label>
+                    <p className="text-sm mt-1">{selectedBorrower.email}</p>
+                  </div>
+                )}
+                {selectedBorrower.reputation_score !== undefined && (
+                  <div>
+                    <Label className="text-muted-foreground">Reputation Score</Label>
+                    <p className={`text-2xl font-bold mt-1 ${getReputationColor(selectedBorrower.reputation_score || 0)}`}>
+                      {selectedBorrower.reputation_score || 'N/A'}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -335,7 +375,7 @@ export default function CreateCreditPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="INR">INR (₹)</SelectItem>
+                      <SelectItem value="NPR">NPR (रू)</SelectItem>
                       <SelectItem value="USD">USD ($)</SelectItem>
                       <SelectItem value="EUR">EUR (€)</SelectItem>
                     </SelectContent>
@@ -426,13 +466,13 @@ export default function CreateCreditPage() {
               <div className="space-y-4">
                 <div className="flex justify-between py-2 border-b border-border">
                   <span className="text-muted-foreground">Borrower</span>
-                  <span className="font-medium">{selectedBorrower?.name}</span>
+                  <span className="font-medium">{selectedBorrower?.full_name}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-border">
                   <span className="text-muted-foreground">Credit Amount</span>
                   <span className="font-semibold text-lg">
-                    {currency === 'INR' ? '₹' : currency === 'USD' ? '$' : '€'}
-                    {parseFloat(creditAmount).toLocaleString('en-IN')}
+                    {currency === 'NPR' ? 'रू ' : currency === 'USD' ? '$' : '€'}
+                    {parseFloat(creditAmount).toLocaleString('en-NP')}
                   </span>
                 </div>
                 <div className="flex justify-between py-2 border-b border-border">
@@ -469,8 +509,8 @@ export default function CreateCreditPage() {
                 <Button variant="outline" onClick={() => setStep('details')} className="flex-1">
                   Back
                 </Button>
-                <Button onClick={handleCreateCredit} className="flex-1" disabled={loading}>
-                  {loading ? (
+                <Button onClick={handleCreateCredit} className="flex-1" disabled={creatingCredit}>
+                  {creatingCredit ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Creating...

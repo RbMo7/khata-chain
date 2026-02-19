@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   DollarSign,
   Users,
@@ -15,98 +16,37 @@ import {
   ArrowUpRight,
   CheckCircle,
   Clock,
-  BarChart3
+  BarChart3,
+  Loader2
 } from 'lucide-react'
 import Link from 'next/link'
+import { formatNPR, formatDateNP } from '@/lib/currency-utils'
+import { useApi } from '@/hooks/use-api'
+import { storeOwnerApi } from '@/lib/api-client'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function StoreOwnerDashboard() {
-  // Mock data - replace with real API calls
-  const stats = {
-    totalOutstanding: 85000, // in paise
-    totalCollected: 245000,
-    activeBorrowers: 12,
-    stripeConnected: true,
-    pendingPayment: 25000
-  }
+  const { user } = useAuth()
+  
+  // Fetch real data from API
+  const { data: stats, loading: statsLoading, error: statsError } = useApi(
+    () => storeOwnerApi.getStats(),
+    []
+  )
 
-  const creditEntries = [
-    {
-      id: '1',
-      borrowerName: 'Rajesh Kumar',
-      amount: 35000,
-      dueDate: '2026-03-15',
-      status: 'active' as const,
-      created: '2026-02-01'
-    },
-    {
-      id: '2',
-      borrowerName: 'Priya Sharma',
-      amount: 20000,
-      dueDate: '2026-03-20',
-      status: 'active' as const,
-      created: '2026-02-10'
-    },
-    {
-      id: '3',
-      borrowerName: 'Amit Patel',
-      amount: 15000,
-      dueDate: '2026-03-10',
-      status: 'overdue' as const,
-      created: '2026-01-25'
-    },
-    {
-      id: '4',
-      borrowerName: 'Sunita Verma',
-      amount: 15000,
-      dueDate: '2026-03-05',
-      status: 'active' as const,
-      created: '2026-02-15'
-    }
-  ]
+  const { data: creditsData, loading: creditsLoading, error: creditsError } = useApi(
+    () => storeOwnerApi.getCredits({ recent: true, limit: 10 }),
+    []
+  )
 
-  const recentPayments = [
-    {
-      id: '1',
-      borrowerName: 'Anil Singh',
-      amount: 12000,
-      date: '2026-02-18',
-      method: 'stripe' as const,
-      status: 'completed' as const
-    },
-    {
-      id: '2',
-      borrowerName: 'Meena Reddy',
-      amount: 18000,
-      date: '2026-02-17',
-      method: 'on_chain' as const,
-      status: 'completed' as const
-    },
-    {
-      id: '3',
-      borrowerName: 'Vikram Shah',
-      amount: 25000,
-      date: '2026-02-16',
-      method: 'stripe' as const,
-      status: 'pending' as const
-    }
-  ]
-
-  const monthlyStats = [
-    { month: 'Jan', credits: 125000, collections: 98000 },
-    { month: 'Feb', credits: 156000, collections: 132000 },
-    { month: 'Mar', credits: 85000, collections: 25000 }
-  ]
+  const creditEntries = creditsData?.data?.credits || []
 
   const formatAmount = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN')}`
+    return formatNPR(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
+    return formatDateNP(dateString)
   }
 
   const getStatusColor = (status: string) => {
@@ -130,6 +70,31 @@ export default function StoreOwnerDashboard() {
     const diffTime = dueDate.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
+  }
+
+  // Loading state
+  if (statsLoading || creditsLoading) {
+    return (
+      <DashboardLayout userType="store-owner">
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Error state
+  if (statsError || creditsError) {
+    return (
+      <DashboardLayout userType="store-owner">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load dashboard data. Please try refreshing the page.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -171,9 +136,9 @@ export default function StoreOwnerDashboard() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatAmount(stats.totalOutstanding)}</div>
+              <div className="text-2xl font-bold">{formatAmount(stats?.data?.totalOutstanding || 0)}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                From {creditEntries.filter(c => c.status === 'active' || c.status === 'overdue').length} active credits
+                From {creditEntries.filter((c: any) => c.status === 'active' || c.status === 'overdue').length} active credits
               </p>
             </CardContent>
           </Card>
@@ -186,7 +151,7 @@ export default function StoreOwnerDashboard() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatAmount(stats.totalCollected)}</div>
+              <div className="text-2xl font-bold">{formatAmount(stats?.data?.totalCollected || 0)}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 This month
               </p>
@@ -201,7 +166,7 @@ export default function StoreOwnerDashboard() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.activeBorrowers}</div>
+              <div className="text-2xl font-bold">{stats?.data?.activeBorrowers || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 With outstanding credits
               </p>
@@ -216,7 +181,7 @@ export default function StoreOwnerDashboard() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatAmount(stats.pendingPayment)}</div>
+              <div className="text-2xl font-bold">{formatAmount(stats?.data?.pendingPayment || 0)}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 From Stripe
               </p>
@@ -225,7 +190,7 @@ export default function StoreOwnerDashboard() {
         </div>
 
         {/* Stripe Connection Banner */}
-        {!stats.stripeConnected && (
+        {!stats?.data?.stripeConnected && (
           <Card className="border-chart-2/50 bg-chart-2/5">
             <CardHeader>
               <div className="flex items-start gap-4">
@@ -251,9 +216,7 @@ export default function StoreOwnerDashboard() {
         {/* Main Content Tabs */}
         <Tabs defaultValue="credits" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="credits">Credit Entries</TabsTrigger>
-            <TabsTrigger value="payments">Recent Payments</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="credits">Recent Credits ({creditEntries.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="credits" className="space-y-4">
@@ -266,8 +229,8 @@ export default function StoreOwnerDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {creditEntries.map((credit) => {
-                    const daysUntilDue = getDaysUntilDue(credit.dueDate)
+                  {creditEntries.map((credit: any) => {
+                    const daysUntilDue = getDaysUntilDue(credit.due_date)
                     const isOverdue = daysUntilDue < 0
 
                     return (
@@ -277,13 +240,13 @@ export default function StoreOwnerDashboard() {
                       >
                         <div className="flex-1 mb-3 sm:mb-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold">{credit.borrowerName}</h3>
+                            <h3 className="font-semibold">{credit.borrower?.full_name || credit.borrower_pubkey}</h3>
                             <Badge variant={getStatusColor(credit.status)}>
                               {credit.status}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            Created {formatDate(credit.created)} • Due {formatDate(credit.dueDate)}
+                            Created {formatDate(credit.created_at)} • Due {formatDate(credit.due_date)}
                             {isOverdue && (
                               <span className="text-destructive ml-1">
                                 (Overdue by {Math.abs(daysUntilDue)} days)
@@ -294,10 +257,10 @@ export default function StoreOwnerDashboard() {
                         <div className="flex items-center gap-4">
                           <div className="text-right">
                             <div className="text-lg font-bold">
-                              {formatAmount(credit.amount)}
+                              {formatAmount(credit.credit_amount)}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              INR
+                              NPR
                             </div>
                           </div>
                           <Link href={`/store-owner/credits/${credit.id}`}>
@@ -310,109 +273,31 @@ export default function StoreOwnerDashboard() {
                       </div>
                     )
                   })}
-                </div>
 
-                <Link href="/store-owner/credits">
-                  <Button variant="outline" className="w-full mt-4">
-                    View All Credits
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="payments" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Payments</CardTitle>
-                <CardDescription>
-                  Latest repayments from borrowers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {recentPayments.map((payment) => (
-                    <div
-                      key={payment.id}
-                      className="flex items-center justify-between p-3 border border-border rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${
-                          payment.status === 'completed' 
-                            ? 'bg-chart-2/10' 
-                            : 'bg-chart-1/10'
-                        }`}>
-                          {payment.status === 'completed' ? (
-                            <CheckCircle className="h-4 w-4 text-chart-2" />
-                          ) : (
-                            <Clock className="h-4 w-4 text-chart-1" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">{payment.borrowerName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(payment.date)} • {payment.method === 'stripe' ? 'Stripe' : 'On-chain'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-chart-2">
-                          {formatAmount(payment.amount)}
-                        </div>
-                        <Badge variant={getStatusColor(payment.status)} className="mt-1">
-                          {payment.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <Link href="/store-owner/payments">
-                  <Button variant="outline" className="w-full mt-4">
-                    View All Payments
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analytics" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Overview</CardTitle>
-                <CardDescription>
-                  Credits issued vs collections
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {monthlyStats.map((stat) => (
-                    <div key={stat.month} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{stat.month} 2026</span>
-                        <span className="text-muted-foreground">
-                          {formatAmount(stat.collections)} / {formatAmount(stat.credits)}
-                        </span>
-                      </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-chart-2 rounded-full transition-all"
-                          style={{ 
-                            width: `${(stat.collections / stat.credits) * 100}%` 
-                          }}
-                        />
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {((stat.collections / stat.credits) * 100).toFixed(1)}% collection rate
+                  {creditEntries.length === 0 && (
+                    <div className="text-center py-12">
+                      <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-lg font-medium">No credits issued yet</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Start issuing credits to your customers
                       </p>
+                      <Link href="/store-owner/create-credit">
+                        <Button>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Issue First Credit
+                        </Button>
+                      </Link>
                     </div>
-                  ))}
+                  )}
                 </div>
 
-                <Button variant="outline" className="w-full mt-6">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  View Detailed Analytics
-                </Button>
+                {creditEntries.length > 0 && (
+                  <Link href="/store-owner/credits">
+                    <Button variant="outline" className="w-full mt-4">
+                      View All Credits
+                    </Button>
+                  </Link>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

@@ -19,15 +19,17 @@ export default function SelectRole() {
   const { setUserType, user } = useAuth()
   const [selected, setSelected] = useState<'borrower' | 'store-owner' | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleContinue = async () => {
     if (!selected || !user) return
 
     setLoading(true)
+    setError(null)
     
     try {
-      // Set the user type in context
-      setUserType(selected)
+      // Set the user type in context (calls API to authenticate)
+      await setUserType(selected)
       
       // For borrowers, redirect to citizenship verification if not verified
       if (selected === 'borrower' && !user.citizenshipVerified) {
@@ -38,8 +40,9 @@ export default function SelectRole() {
         // Store owners go directly to dashboard
         router.push('/store-owner/dashboard')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to set user type:', error)
+      setError(error?.message || 'Failed to complete registration. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -64,6 +67,13 @@ export default function SelectRole() {
               <strong className="font-semibold">Wallet Connected:</strong>{' '}
               {user.walletAddress.slice(0, 4)}...{user.walletAddress.slice(-4)} ({user.walletType})
             </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 

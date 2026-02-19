@@ -9,7 +9,7 @@ import { createCreditEntry, getBorrowerByPubkey } from '@/lib/services'
  * Body: {
  *   borrowerPubkey: string,
  *   creditAmount: number (in paise),
- *   currency: string (default: 'INR'),
+ *   currency: string (default: 'NPR'),
  *   description: string,
  *   dueDate: string (ISO date),
  *   interestRate?: number,
@@ -36,7 +36,7 @@ async function handler(req: NextRequest) {
     const {
       borrowerPubkey,
       creditAmount,
-      currency = 'INR',
+      currency = 'NPR',
       description,
       dueDate,
       interestRate,

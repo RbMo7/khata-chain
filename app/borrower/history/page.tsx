@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Table,
   TableBody,
@@ -21,77 +22,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, ArrowUpRight, Download, Filter } from 'lucide-react'
+import { Search, ArrowUpRight, Download, Filter, AlertCircle, Loader2 } from 'lucide-react'
+import { formatNPR, formatDateNP } from '@/lib/currency-utils'
 import Link from 'next/link'
+import { useApi } from '@/hooks/use-api'
+import { borrowerApi } from '@/lib/api-client'
 
 export default function BorrowerHistory() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Mock data
-  const transactions = [
-    {
-      id: '1',
-      type: 'credit' as const,
-      storeName: 'Sharma Kirana Store',
-      amount: 15000,
-      date: '2026-02-01',
-      dueDate: '2026-03-15',
-      status: 'active' as const,
-      method: 'on_chain' as const
-    },
-    {
-      id: '2',
-      type: 'repayment' as const,
-      storeName: 'Singh Hardware',
-      amount: 5000,
-      date: '2026-02-18',
-      dueDate: null,
-      status: 'completed' as const,
-      method: 'stripe' as const
-    },
-    {
-      id: '3',
-      type: 'credit' as const,
-      storeName: 'Kumar Textiles',
-      amount: 12000,
-      date: '2026-02-15',
-      dueDate: '2026-03-20',
-      status: 'active' as const,
-      method: 'on_chain' as const
-    },
-    {
-      id: '4',
-      type: 'repayment' as const,
-      storeName: 'Verma Groceries',
-      amount: 8000,
-      date: '2026-02-10',
-      dueDate: null,
-      status: 'completed' as const,
-      method: 'on_chain' as const
-    },
-    {
-      id: '5',
-      type: 'credit' as const,
-      storeName: 'Patel General Store',
-      amount: 20000,
-      date: '2026-01-28',
-      dueDate: '2026-02-28',
-      status: 'overdue' as const,
-      method: 'on_chain' as const
-    },
-  ]
+  // Fetch all credits from API (no status filter to get complete history)
+  const { data: creditsData, loading, error } = useApi(
+    () => borrowerApi.getCredits(),
+    []
+  )
+
+  const allCredits = creditsData?.data?.credits || []
 
   const formatAmount = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN')}`
+    return formatNPR(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
+    return formatDateNP(dateString)
   }
 
   const getStatusColor = (status: string) => {
@@ -104,20 +58,45 @@ export default function BorrowerHistory() {
   }
 
   const getTypeColor = (type: string) => {
-    return type === 'credit' ? 'text-chart-1' : 'text-chart-2'
+    return 'text-chart-1' // All are credits for now
   }
 
-  const filteredTransactions = transactions.filter(tx => {
-    const matchesSearch = tx.storeName.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || tx.status === statusFilter
+  const filteredCredits = allCredits.filter((credit: any) => {
+    const matchesSearch = credit.store_owner?.store_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         credit.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         false
+    const matchesStatus = statusFilter === 'all' || credit.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
   const stats = {
-    totalCredits: transactions.filter(t => t.type === 'credit').length,
-    totalRepayments: transactions.filter(t => t.type === 'repayment').length,
-    active: transactions.filter(t => t.status === 'active').length,
-    completed: transactions.filter(t => t.status === 'completed').length,
+    totalCredits: allCredits.length,
+    active: allCredits.filter((c: any) => c.status === 'active').length,
+    completed: allCredits.filter((c: any) => c.status === 'completed').length,
+    overdue: allCredits.filter((c: any) => c.status === 'overdue').length,
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout userType="borrower">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load transaction history. Please try refreshing the page.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -125,9 +104,9 @@ export default function BorrowerHistory() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Transaction History</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Credit History</h1>
           <p className="text-muted-foreground mt-1">
-            View all your credits and repayments
+            View all your credits and their status
           </p>
         </div>
 
@@ -141,17 +120,6 @@ export default function BorrowerHistory() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalCredits}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Repayments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalRepayments}</div>
             </CardContent>
           </Card>
 
@@ -176,6 +144,17 @@ export default function BorrowerHistory() {
               <div className="text-2xl font-bold">{stats.completed}</div>
             </CardContent>
           </Card>
+
+          <Card className="border-destructive/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-destructive">
+                Overdue
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{stats.overdue}</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters */}
@@ -183,9 +162,9 @@ export default function BorrowerHistory() {
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between gap-4">
               <div>
-                <CardTitle>All Transactions</CardTitle>
+                <CardTitle>All Credits</CardTitle>
                 <CardDescription>
-                  {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} found
+                  {filteredCredits.length} credit{filteredCredits.length !== 1 ? 's' : ''} found
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -225,54 +204,63 @@ export default function BorrowerHistory() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>Date Issued</TableHead>
                     <TableHead>Store</TableHead>
+                    <TableHead>Description</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Method</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTransactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="font-medium">
-                        {formatDate(tx.date)}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`font-semibold ${getTypeColor(tx.type)}`}>
-                          {tx.type === 'credit' ? 'Credit' : 'Repayment'}
-                        </span>
-                      </TableCell>
-                      <TableCell>{tx.storeName}</TableCell>
-                      <TableCell className="font-semibold">
-                        {formatAmount(tx.amount)}
-                      </TableCell>
-                      <TableCell>
-                        {tx.dueDate ? formatDate(tx.dueDate) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusColor(tx.status)}>
-                          {tx.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {tx.method === 'stripe' ? 'Stripe' : 'On-chain'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {tx.type === 'credit' && tx.status === 'active' && (
-                          <Link href={`/borrower/repay?credit_entry_id=${tx.id}`}>
-                            <Button size="sm" variant="ghost">
-                              Repay
-                              <ArrowUpRight className="ml-1 h-3 w-3" />
-                            </Button>
-                          </Link>
-                        )}
+                  {filteredCredits.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-12">
+                        <p className="text-lg font-medium">No credits found</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'No credit history available'}
+                        </p>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    filteredCredits.map((credit: any) => (
+                      <TableRow key={credit.id}>
+                        <TableCell className="font-medium">
+                          {formatDate(credit.created_at)}
+                        </TableCell>
+                        <TableCell>
+                          {credit.store_owner?.store_name || 'Store'}
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {credit.description || 'No description'}
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          {formatAmount(credit.credit_amount)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(credit.due_date)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusColor(credit.status)}>
+                            {credit.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {credit.status === 'active' || credit.status === 'overdue' ? (
+                            <Link href={`/borrower/repay?credit_entry_id=${credit.id}`}>
+                              <Button size="sm" variant="ghost">
+                                Repay
+                                <ArrowUpRight className="ml-1 h-3 w-3" />
+                              </Button>
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

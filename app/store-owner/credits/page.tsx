@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Table,
   TableBody,
@@ -21,72 +22,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, ArrowUpRight, Download, Filter, Plus } from 'lucide-react'
+import { Search, ArrowUpRight, Download, Filter, Plus, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { formatNPR, formatDateNP } from '@/lib/currency-utils'
+import { useApi } from '@/hooks/use-api'
+import { storeOwnerApi } from '@/lib/api-client'
+
 
 export default function StoreOwnerCredits() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Mock data
-  const credits = [
-    {
-      id: '1',
-      borrowerName: 'Rajesh Kumar',
-      amount: 35000,
-      issueDate: '2026-02-01',
-      dueDate: '2026-03-15',
-      status: 'active' as const,
-      description: 'Grocery supplies'
-    },
-    {
-      id: '2',
-      borrowerName: 'Priya Sharma',
-      amount: 20000,
-      issueDate: '2026-02-10',
-      dueDate: '2026-03-20',
-      status: 'active' as const,
-      description: 'Household items'
-    },
-    {
-      id: '3',
-      borrowerName: 'Amit Patel',
-      amount: 15000,
-      issueDate: '2026-01-25',
-      dueDate: '2026-03-10',
-      status: 'overdue' as const,
-      description: 'Electronics'
-    },
-    {
-      id: '4',
-      borrowerName: 'Sunita Verma',
-      amount: 12000,
-      issueDate: '2026-01-20',
-      dueDate: '2026-02-20',
-      status: 'completed' as const,
-      description: 'General store items'
-    },
-    {
-      id: '5',
-      borrowerName: 'Vikram Shah',
-      amount: 25000,
-      issueDate: '2026-02-15',
-      dueDate: '2026-03-25',
-      status: 'active' as const,
-      description: 'Building materials'
-    },
-  ]
+  // Fetch credits from API based on status filter
+  const { data: creditsData, loading, error } = useApi(
+    () => storeOwnerApi.getCredits({ 
+      status: statusFilter === 'all' ? undefined : statusFilter 
+    }),
+    [statusFilter]
+  )
+
+  const credits = creditsData?.data?.credits || []
 
   const formatAmount = (amount: number) => {
-    return `₹${(amount / 100).toLocaleString('en-IN')}`
+    return formatNPR(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
+    return formatDateNP(dateString)
   }
 
   const getStatusColor = (status: string) => {
@@ -106,18 +68,41 @@ export default function StoreOwnerCredits() {
     return diffDays
   }
 
-  const filteredCredits = credits.filter(credit => {
-    const matchesSearch = credit.borrowerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         credit.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || credit.status === statusFilter
-    return matchesSearch && matchesStatus
+  const filteredCredits = credits.filter((credit: any) => {
+    const matchesSearch = credit.borrower?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         credit.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         false
+    return matchesSearch
   })
 
   const stats = {
     total: credits.length,
-    active: credits.filter(c => c.status === 'active').length,
-    completed: credits.filter(c => c.status === 'completed').length,
-    overdue: credits.filter(c => c.status === 'overdue').length,
+    active: credits.filter((c: any) => c.status === 'active').length,
+    completed: credits.filter((c: any) => c.status === 'completed').length,
+    overdue: credits.filter((c: any) => c.status === 'overdue').length,
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout userType="store-owner">
+        <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout userType="store-owner">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Failed to load credits. Please try refreshing the page.
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -243,50 +228,61 @@ export default function StoreOwnerCredits() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCredits.map((credit) => {
-                    const daysUntilDue = getDaysUntilDue(credit.dueDate)
-                    const isOverdue = daysUntilDue < 0
+                  {filteredCredits.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-12">
+                        <p className="text-lg font-medium">No credits found</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {searchQuery ? 'Try adjusting your search' : 'Start by creating your first credit entry'}
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredCredits.map((credit: any) => {
+                      const daysUntilDue = getDaysUntilDue(credit.due_date)
+                      const isOverdue = daysUntilDue < 0
 
-                    return (
-                      <TableRow key={credit.id}>
-                        <TableCell className="font-medium">
-                          {credit.borrowerName}
-                        </TableCell>
-                        <TableCell className="font-semibold">
-                          {formatAmount(credit.amount)}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {credit.description}
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(credit.issueDate)}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div>{formatDate(credit.dueDate)}</div>
-                            {credit.status === 'active' && (
-                              <div className={`text-xs ${isOverdue ? 'text-destructive' : 'text-muted-foreground'}`}>
-                                {isOverdue ? `${Math.abs(daysUntilDue)} days overdue` : `in ${daysUntilDue} days`}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusColor(credit.status)}>
-                            {credit.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Link href={`/store-owner/credits/${credit.id}`}>
-                            <Button size="sm" variant="ghost">
-                              View
-                              <ArrowUpRight className="ml-1 h-3 w-3" />
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+                      return (
+                        <TableRow key={credit.id}>
+                          <TableCell className="font-medium">
+                            {credit.borrower?.full_name || credit.borrower_pubkey}
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                            {formatAmount(credit.credit_amount)}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {credit.description || 'No description'}
+                          </TableCell>
+                          <TableCell>
+                            {formatDate(credit.created_at)}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div>{formatDate(credit.due_date)}</div>
+                              {credit.status === 'active' && (
+                                <div className={`text-xs ${isOverdue ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                  {isOverdue ? `${Math.abs(daysUntilDue)} days overdue` : `in ${daysUntilDue} days`}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusColor(credit.status)}>
+                              {credit.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Link href={`/store-owner/credits/${credit.id}`}>
+                              <Button size="sm" variant="ghost">
+                                View
+                                <ArrowUpRight className="ml-1 h-3 w-3" />
+                              </Button>
+                            </Link>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>

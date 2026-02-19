@@ -14,6 +14,7 @@ export interface AuthUser {
   walletAddress: string
   userType: 'borrower' | 'store-owner'
   email: string
+  name?: string
   citizenshipVerified?: boolean
   data: Borrower | StoreOwner
 }
@@ -37,6 +38,7 @@ export async function authenticateWallet(walletAddress: string): Promise<AuthUse
         walletAddress: borrower.wallet_address,
         userType: 'borrower',
         email: borrower.email,
+        name: borrower.full_name || undefined,
         citizenshipVerified: !!borrower.citizenship_verified_at,
         data: borrower,
       }
@@ -55,6 +57,7 @@ export async function authenticateWallet(walletAddress: string): Promise<AuthUse
         walletAddress: storeOwner.store_owner_pubkey,
         userType: 'store-owner',
         email: storeOwner.email,
+        name: storeOwner.store_name || undefined,
         data: storeOwner,
       }
     }
@@ -73,7 +76,8 @@ export async function authenticateWallet(walletAddress: string): Promise<AuthUse
 export async function getOrCreateUser(
   walletAddress: string,
   userType: 'borrower' | 'store-owner',
-  email?: string
+  email?: string,
+  name?: string
 ): Promise<AuthUser | null> {
   try {
     // First try to authenticate existing user
@@ -90,6 +94,7 @@ export async function getOrCreateUser(
           borrower_pubkey: walletAddress,
           wallet_address: walletAddress,
           email: email || `${walletAddress.slice(0, 8)}@khatachain.temp`,
+          full_name: name || null,
           original_citizenship_hash_verified: false,
         })
         .select()
@@ -105,6 +110,7 @@ export async function getOrCreateUser(
         walletAddress: newBorrower.wallet_address,
         userType: 'borrower',
         email: newBorrower.email,
+        name: newBorrower.full_name,
         citizenshipVerified: false,
         data: newBorrower,
       }
@@ -114,7 +120,7 @@ export async function getOrCreateUser(
         .insert({
           store_owner_pubkey: walletAddress,
           email: email || `${walletAddress.slice(0, 8)}@khatachain.temp`,
-          store_name: 'My Store', // Default, can be updated later
+          store_name: name || 'My Store', // Use provided name or default
         })
         .select()
         .single()
@@ -129,6 +135,7 @@ export async function getOrCreateUser(
         walletAddress: newStoreOwner.store_owner_pubkey,
         userType: 'store-owner',
         email: newStoreOwner.email,
+        name: newStoreOwner.store_name,
         data: newStoreOwner,
       }
     }

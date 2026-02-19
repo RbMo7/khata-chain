@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
-import { WalletConnectModal } from '@/components/WalletConnectModal'
+import { AuthModal } from '@/components/AuthModal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,8 +14,10 @@ export default function HomePage() {
   const router = useRouter()
   const { user, isAuthenticated, connectWallet } = useAuth()
   const [showWalletModal, setShowWalletModal] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleGetStarted = () => {
+    setError(null)
     if (isAuthenticated) {
       // User is already authenticated, go to their dashboard
       if (user?.userType === 'borrower') {
@@ -32,18 +34,29 @@ export default function HomePage() {
     }
   }
 
-  const handleWalletConnect = async (address: string, walletType: string) => {
-    await connectWallet(address, walletType)
-    // Redirect to role selection
-    router.push('/select-role')
+  const handleAuthComplete = async (address: string, walletType: string, userType: 'borrower' | 'store-owner', name?: string, email?: string) => {
+    try {
+      setError(null)
+      await connectWallet(address, walletType, userType, name, email)
+      
+      // Redirect based on user type
+      if (userType === 'borrower') {
+        router.push('/borrower/dashboard')
+      } else {
+        router.push('/store-owner/dashboard')
+      }
+    } catch (err: any) {
+      console.error('Authentication failed:', err)
+      throw err // Re-throw so AuthModal can show the error
+    }
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <WalletConnectModal
+      <AuthModal
         open={showWalletModal}
         onOpenChange={setShowWalletModal}
-        onConnect={handleWalletConnect}
+        onComplete={handleAuthComplete}
       />
 
       {/* Hero Section */}

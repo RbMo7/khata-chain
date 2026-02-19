@@ -10,10 +10,11 @@ import { searchBorrowers } from '@/lib/services'
 async function handler(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const query = searchParams.get('q')
+    const query = searchParams.get('q') || ''
     const limit = parseInt(searchParams.get('limit') || '20')
 
-    if (!query || query.length < 2) {
+    // If query is provided but too short, return error
+    if (query && query.length < 2) {
       return errorResponse('Search query must be at least 2 characters', 400)
     }
 
