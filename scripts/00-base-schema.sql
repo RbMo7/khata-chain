@@ -18,11 +18,12 @@ CREATE TABLE IF NOT EXISTS borrowers (
     updated_at TIMESTAMP DEFAULT NOW(),
     citizenship_number_hash VARCHAR(255) UNIQUE,
     citizenship_verified_at TIMESTAMP,
-    original_citizenship_hash_verified BOOLEAN DEFAULT false,
-    INDEX idx_borrower_pubkey (borrower_pubkey),
-    INDEX idx_email (email),
-    INDEX idx_citizenship_hash (citizenship_number_hash)
+    original_citizenship_hash_verified BOOLEAN DEFAULT false
 );
+
+CREATE INDEX IF NOT EXISTS idx_borrower_pubkey ON borrowers(borrower_pubkey);
+CREATE INDEX IF NOT EXISTS idx_email ON borrowers(email);
+CREATE INDEX IF NOT EXISTS idx_citizenship_hash ON borrowers(citizenship_number_hash);
 
 -- Create store_owners table
 CREATE TABLE IF NOT EXISTS store_owners (
@@ -37,10 +38,11 @@ CREATE TABLE IF NOT EXISTS store_owners (
     phone_number VARCHAR(20),
     business_type VARCHAR(100),
     created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    INDEX idx_store_owner_pubkey (store_owner_pubkey),
-    INDEX idx_email (email)
+    updated_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_store_owner_pubkey ON store_owners(store_owner_pubkey);
+CREATE INDEX IF NOT EXISTS idx_store_owners_email ON store_owners(email);
 
 -- Create credit_entries table
 CREATE TABLE IF NOT EXISTS credit_entries (
@@ -59,13 +61,14 @@ CREATE TABLE IF NOT EXISTS credit_entries (
     stripe_payment_intent_id VARCHAR(255),
     repayment_status VARCHAR(50) DEFAULT 'pending' CHECK (repayment_status IN ('pending', 'partial', 'completed', 'refunded', 'failed')),
     FOREIGN KEY (borrower_pubkey) REFERENCES borrowers(borrower_pubkey) ON DELETE CASCADE,
-    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey) ON DELETE CASCADE,
-    INDEX idx_borrower (borrower_pubkey),
-    INDEX idx_store_owner (store_owner_pubkey),
-    INDEX idx_status (status),
-    INDEX idx_created_at (created_at),
-    INDEX idx_due_date (due_date)
+    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_credit_borrower ON credit_entries(borrower_pubkey);
+CREATE INDEX IF NOT EXISTS idx_credit_store_owner ON credit_entries(store_owner_pubkey);
+CREATE INDEX IF NOT EXISTS idx_credit_status ON credit_entries(status);
+CREATE INDEX IF NOT EXISTS idx_credit_created ON credit_entries(created_at);
+CREATE INDEX IF NOT EXISTS idx_credit_due_date ON credit_entries(due_date);
 
 -- Create citizenship_registrations table for audit trail
 CREATE TABLE IF NOT EXISTS citizenship_registrations (
@@ -76,11 +79,12 @@ CREATE TABLE IF NOT EXISTS citizenship_registrations (
     registered_at TIMESTAMP DEFAULT NOW(),
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
     verified_at TIMESTAMP,
-    FOREIGN KEY (borrower_pubkey) REFERENCES borrowers(borrower_pubkey) ON DELETE CASCADE,
-    INDEX idx_citizenship_hash (citizenship_number_hash),
-    INDEX idx_borrower_pubkey (borrower_pubkey),
-    INDEX idx_status (status)
+    FOREIGN KEY (borrower_pubkey) REFERENCES borrowers(borrower_pubkey) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_citizenship_reg_hash ON citizenship_registrations(citizenship_number_hash);
+CREATE INDEX IF NOT EXISTS idx_citizenship_reg_pubkey ON citizenship_registrations(borrower_pubkey);
+CREATE INDEX IF NOT EXISTS idx_citizenship_reg_status ON citizenship_registrations(status);
 
 -- Create citizenship_verification_logs table (audit trail)
 CREATE TABLE IF NOT EXISTS citizenship_verification_logs (
@@ -91,10 +95,11 @@ CREATE TABLE IF NOT EXISTS citizenship_verification_logs (
     verification_result VARCHAR(50) CHECK (verification_result IN ('allowed', 'rejected_duplicate', 'rejected_invalid')),
     reason VARCHAR(500),
     ip_address VARCHAR(45),
-    user_agent VARCHAR(500),
-    INDEX idx_citizenship_hash (citizenship_hash),
-    INDEX idx_verification_attempt (verification_attempt_at)
+    user_agent VARCHAR(500)
 );
+
+CREATE INDEX IF NOT EXISTS idx_citizenship_log_hash ON citizenship_verification_logs(citizenship_hash);
+CREATE INDEX IF NOT EXISTS idx_citizenship_log_attempt ON citizenship_verification_logs(verification_attempt_at);
 
 -- Create stripe_payments table
 CREATE TABLE IF NOT EXISTS stripe_payments (
@@ -118,14 +123,15 @@ CREATE TABLE IF NOT EXISTS stripe_payments (
     metadata JSONB DEFAULT '{}',
     FOREIGN KEY (credit_entry_id) REFERENCES credit_entries(id) ON DELETE CASCADE,
     FOREIGN KEY (borrower_pubkey) REFERENCES borrowers(borrower_pubkey),
-    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey),
-    INDEX idx_payment_intent (payment_intent_id),
-    INDEX idx_credit_entry (credit_entry_id),
-    INDEX idx_borrower (borrower_pubkey),
-    INDEX idx_store_owner (store_owner_pubkey),
-    INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
+    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey)
 );
+
+CREATE INDEX IF NOT EXISTS idx_stripe_payment_intent ON stripe_payments(payment_intent_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_credit_entry ON stripe_payments(credit_entry_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_borrower ON stripe_payments(borrower_pubkey);
+CREATE INDEX IF NOT EXISTS idx_stripe_store_owner ON stripe_payments(store_owner_pubkey);
+CREATE INDEX IF NOT EXISTS idx_stripe_status ON stripe_payments(status);
+CREATE INDEX IF NOT EXISTS idx_stripe_created ON stripe_payments(created_at);
 
 -- Create store_owner_stripe_accounts table
 CREATE TABLE IF NOT EXISTS store_owner_stripe_accounts (
@@ -145,11 +151,12 @@ CREATE TABLE IF NOT EXISTS store_owner_stripe_accounts (
     charges_enabled BOOLEAN DEFAULT false,
     payouts_enabled BOOLEAN DEFAULT false,
     requirements_pending JSONB DEFAULT '[]',
-    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey) ON DELETE CASCADE,
-    INDEX idx_store_owner (store_owner_pubkey),
-    INDEX idx_stripe_account (stripe_account_id),
-    INDEX idx_onboarding_status (onboarding_status)
+    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_stripe_account_owner ON store_owner_stripe_accounts(store_owner_pubkey);
+CREATE INDEX IF NOT EXISTS idx_stripe_account_id ON store_owner_stripe_accounts(stripe_account_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_onboarding_status ON store_owner_stripe_accounts(onboarding_status);
 
 -- Create stripe_payouts table
 CREATE TABLE IF NOT EXISTS stripe_payouts (
@@ -166,11 +173,12 @@ CREATE TABLE IF NOT EXISTS stripe_payouts (
     failure_reason VARCHAR(500),
     automatic BOOLEAN DEFAULT true,
     method VARCHAR(50),
-    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey) ON DELETE CASCADE,
-    INDEX idx_store_owner (store_owner_pubkey),
-    INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
+    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey) ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_payout_store_owner ON stripe_payouts(store_owner_pubkey);
+CREATE INDEX IF NOT EXISTS idx_payout_status ON stripe_payouts(status);
+CREATE INDEX IF NOT EXISTS idx_payout_created ON stripe_payouts(created_at);
 
 -- Create stripe_webhook_events table
 CREATE TABLE IF NOT EXISTS stripe_webhook_events (
@@ -181,12 +189,13 @@ CREATE TABLE IF NOT EXISTS stripe_webhook_events (
     processed BOOLEAN DEFAULT false,
     processed_at TIMESTAMP,
     error_message VARCHAR(500),
-    created_at TIMESTAMP DEFAULT NOW(),
-    INDEX idx_event_id (stripe_event_id),
-    INDEX idx_event_type (event_type),
-    INDEX idx_processed (processed),
-    INDEX idx_created_at (created_at)
+    created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_webhook_event_id ON stripe_webhook_events(stripe_event_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_event_type ON stripe_webhook_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_webhook_processed ON stripe_webhook_events(processed);
+CREATE INDEX IF NOT EXISTS idx_webhook_created ON stripe_webhook_events(created_at);
 
 -- Create stripe_disputes table
 CREATE TABLE IF NOT EXISTS stripe_disputes (
@@ -202,22 +211,12 @@ CREATE TABLE IF NOT EXISTS stripe_disputes (
     updated_at TIMESTAMP DEFAULT NOW(),
     evidence_due_by TIMESTAMP,
     FOREIGN KEY (payment_id) REFERENCES stripe_payments(id) ON DELETE CASCADE,
-    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey),
-    INDEX idx_dispute_id (stripe_dispute_id),
-    INDEX idx_store_owner (store_owner_pubkey),
-    INDEX idx_status (status)
+    FOREIGN KEY (store_owner_pubkey) REFERENCES store_owners(store_owner_pubkey)
 );
 
--- Create RLS policies for security
-ALTER TABLE borrowers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE store_owners ENABLE ROW LEVEL SECURITY;
-ALTER TABLE credit_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stripe_payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stripe_webhook_events ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_dispute_id ON stripe_disputes(stripe_dispute_id);
+CREATE INDEX IF NOT EXISTS idx_dispute_store_owner ON stripe_disputes(store_owner_pubkey);
+CREATE INDEX IF NOT EXISTS idx_dispute_status ON stripe_disputes(status);
 
--- Allow service role to manage all tables
-CREATE POLICY "Service role can manage borrowers" ON borrowers FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Service role can manage store_owners" ON store_owners FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Service role can manage credit_entries" ON credit_entries FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Service role can manage stripe_payments" ON stripe_payments FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Service role can manage stripe_webhook_events" ON stripe_webhook_events FOR ALL USING (true) WITH CHECK (true);
+-- RLS policies can be configured in Supabase dashboard
+-- For now, grant anon and authenticated users basic read access via API
