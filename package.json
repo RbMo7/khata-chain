@@ -10,7 +10,13 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
+    "@stripe/react-stripe-js": "^2.7.0",
+    "@stripe/stripe-js": "^3.4.0",
+    "@supabase/supabase-js": "^2.45.0",
     "@vercel/analytics": "1.6.1",
+    "bcryptjs": "^2.4.3",
+    "crypto-js": "^4.2.0",
+    "stripe": "^14.21.0",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.8",
