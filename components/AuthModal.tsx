@@ -61,12 +61,14 @@ export function AuthModal({ open, onOpenChange, onComplete }: AuthModalProps) {
 
   // Helper function to add timeout to promises
   const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMsg: string): Promise<T> => {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) => 
-        setTimeout(() => reject(new Error(errorMsg)), timeoutMs)
+    let timer: ReturnType<typeof setTimeout>
+    return new Promise<T>((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(errorMsg)), timeoutMs)
+      promise.then(
+        (val) => { clearTimeout(timer); resolve(val) },
+        (err) => { clearTimeout(timer); reject(err) }
       )
-    ])
+    })
   }
 
   // Check which wallet extensions are installed
@@ -122,14 +124,6 @@ export function AuthModal({ open, onOpenChange, onComplete }: AuthModalProps) {
       }
 
       console.log(`Attempting to connect to ${provider.name}...`)
-
-      // For Phantom, wait for it to be ready
-      if (provider.adapter === 'phantom' && walletObj) {
-        const startTime = Date.now()
-        while (!walletObj.isConnected && !walletObj.publicKey && (Date.now() - startTime) < 5000) {
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
-      }
 
       // Request connection with timeout (30 seconds)
       let resp: any

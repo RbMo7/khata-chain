@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
 import { getCreditEntryById, updateCreditStatus } from '@/lib/services'
 import { createCreditNFT } from '@/lib/solana/credit-nft'
+import { onCreditAccepted } from '@/lib/services/reputation.service'
 
 /**
  * POST /api/credits/[id]/approve
@@ -60,6 +61,13 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ id: str
 
     if (!updatedCredit) {
       return errorResponse('Failed to approve credit', 500)
+    }
+
+    // Update reputation – credit accepted by borrower
+    try {
+      await onCreditAccepted(user.walletAddress, creditId)
+    } catch (repErr) {
+      console.error('[Approve Credit] Reputation update failed (non-fatal):', repErr)
     }
 
     return successResponse({

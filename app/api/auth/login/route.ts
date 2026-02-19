@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateWallet, getOrCreateUser } from '@/lib/services'
 import { successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
+import { initReputationIfNeeded } from '@/lib/services/reputation.service'
 
 /**
  * POST /api/auth/login
@@ -48,6 +49,15 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return errorResponse('Failed to authenticate or create user', 500)
+    }
+
+    // Ensure reputation row exists for borrowers
+    if (userType === 'borrower') {
+      try {
+        await initReputationIfNeeded(walletAddress)
+      } catch (repErr) {
+        console.error('[Auth Login] Reputation init failed (non-fatal):', repErr)
+      }
     }
 
     return successResponse({

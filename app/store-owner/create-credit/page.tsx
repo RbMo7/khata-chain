@@ -18,12 +18,13 @@ import {
 } from '@/components/ui/select'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { CalendarIcon, CheckCircle, Search, AlertCircle, Loader2 } from 'lucide-react'
+import { CalendarIcon, CheckCircle, Search, AlertCircle, Loader2, TrendingUp } from 'lucide-react'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { formatNPR } from '@/lib/currency-utils'
 import { useApi, useMutation } from '@/hooks/use-api'
 import { searchApi, creditApi } from '@/lib/api-client'
+import { ReputationBadge } from '@/components/ReputationBadge'
 
 export default function CreateCreditPage() {
   const router = useRouter()
@@ -248,9 +249,20 @@ export default function CreateCreditPage() {
                             <p className="font-medium">{borrower.full_name}</p>
                             <p className="text-xs text-muted-foreground">{borrower.borrower_pubkey?.slice(0, 8)}...{borrower.borrower_pubkey?.slice(-8)}</p>
                           </div>
-                          <Badge variant={borrower.citizenship_verified ? 'default' : 'secondary'}>
-                            {borrower.citizenship_verified ? 'Verified' : 'Unverified'}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            {borrower.reputation_score != null && (
+                              <span className={`text-sm font-bold flex items-center gap-1 ${
+                                borrower.reputation_score >= 700 ? 'text-emerald-600 dark:text-emerald-400' :
+                                borrower.reputation_score >= 550 ? 'text-amber-600 dark:text-amber-400' :
+                                'text-red-600 dark:text-red-400'
+                              }`}>
+                                <TrendingUp className="h-3 w-3" />{borrower.reputation_score}
+                              </span>
+                            )}
+                            <Badge variant={borrower.citizenship_verified ? 'default' : 'secondary'}>
+                              {borrower.citizenship_verified ? 'Verified' : 'Unverified'}
+                            </Badge>
+                          </div>
                         </div>
                       </button>
                     ))}
@@ -275,9 +287,20 @@ export default function CreateCreditPage() {
                           <p className="font-medium">{borrower.full_name}</p>
                           <p className="text-xs text-muted-foreground">{borrower.borrower_pubkey?.slice(0, 8)}...{borrower.borrower_pubkey?.slice(-8)}</p>
                         </div>
-                        <Badge variant={borrower.citizenship_verified ? 'default' : 'secondary'}>
-                          {borrower.citizenship_verified ? 'Verified' : 'Unverified'}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {borrower.reputation_score != null && (
+                            <span className={`text-sm font-bold flex items-center gap-1 ${
+                              borrower.reputation_score >= 700 ? 'text-emerald-600 dark:text-emerald-400' :
+                              borrower.reputation_score >= 550 ? 'text-amber-600 dark:text-amber-400' :
+                              'text-red-600 dark:text-red-400'
+                            }`}>
+                              <TrendingUp className="h-3 w-3" />{borrower.reputation_score}
+                            </span>
+                          )}
+                          <Badge variant={borrower.citizenship_verified ? 'default' : 'secondary'}>
+                            {borrower.citizenship_verified ? 'Verified' : 'Unverified'}
+                          </Badge>
+                        </div>
                       </div>
                     </button>
                   ))}
@@ -325,14 +348,12 @@ export default function CreateCreditPage() {
                     <p className="text-sm mt-1">{selectedBorrower.email}</p>
                   </div>
                 )}
-                {selectedBorrower.reputation_score !== undefined && (
-                  <div>
-                    <Label className="text-muted-foreground">Reputation Score</Label>
-                    <p className={`text-2xl font-bold mt-1 ${getReputationColor(selectedBorrower.reputation_score || 0)}`}>
-                      {selectedBorrower.reputation_score || 'N/A'}
-                    </p>
-                  </div>
-                )}
+              </div>
+
+              {/* Live reputation widget */}
+              <div>
+                <Label className="text-muted-foreground block mb-2">Borrower Reputation</Label>
+                <ReputationBadge borrowerPubkey={selectedBorrower.borrower_pubkey} />
               </div>
 
               <div className="flex gap-3 pt-4">

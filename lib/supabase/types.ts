@@ -112,7 +112,7 @@ export interface Database {
           description: string | null
           created_at: string
           due_date: string | null
-          status: 'active' | 'completed' | 'overdue' | 'cancelled'
+          status: 'active' | 'completed' | 'overdue' | 'cancelled' | 'pending_approval'
           nft_mint_address: string | null
           stripe_repayment_amount: number
           repayment_method: 'on_chain' | 'stripe' | 'hybrid'

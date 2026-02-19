@@ -162,13 +162,14 @@ export async function updateCitizenshipVerification(
 }
 
 /**
- * Search borrowers by name or email
+ * Search borrowers by name or email.
+ * Includes reputation_score from the borrower_reputation table.
  */
-export async function searchBorrowers(query: string, limit: number = 10): Promise<Borrower[]> {
+export async function searchBorrowers(query: string, limit: number = 10): Promise<(Borrower & { reputation_score?: number })[]> {
   try {
     let queryBuilder = supabaseAdmin
       .from('borrowers')
-      .select('*')
+      .select('*, borrower_reputation(reputation_score)')
       .limit(limit)
       .order('created_at', { ascending: false })
     
@@ -184,7 +185,12 @@ export async function searchBorrowers(query: string, limit: number = 10): Promis
       return []
     }
 
-    return data || []
+    // Flatten reputation_score from the nested join
+    return (data || []).map((b: any) => ({
+      ...b,
+      reputation_score: b.borrower_reputation?.[0]?.reputation_score ?? null,
+      borrower_reputation: undefined,
+    }))
   } catch (error) {
     console.error('Search borrowers error:', error)
     return []

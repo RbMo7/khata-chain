@@ -248,6 +248,19 @@ export const citizenshipApi = {
 };
 
 /**
+ * Reputation API endpoints
+ */
+export const reputationApi = {
+  /** Public – used by store owners. Returns score, tier, warning. */
+  getPublic: (borrowerPubkey: string) =>
+    get(`/api/reputation/${borrowerPubkey}`),
+
+  /** Authenticated – full reputation with events + projected scores. */
+  getMy: () =>
+    get('/api/borrower/reputation'),
+};
+
+/**
  * Stripe API endpoints
  */
 export const stripeApi = {

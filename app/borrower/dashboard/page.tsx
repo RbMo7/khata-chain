@@ -17,12 +17,13 @@ import {
   ArrowUpRight,
   Wallet,
   ShieldCheck,
-  Loader2
+  Loader2,
+  Award
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
 import { useApi } from '@/hooks/use-api'
-import { borrowerApi } from '@/lib/api-client'
+import { borrowerApi, reputationApi } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function BorrowerDashboard() {
@@ -39,7 +40,21 @@ export default function BorrowerDashboard() {
     []
   )
 
+  const { data: reputationData } = useApi(
+    () => reputationApi.getMy(),
+    []
+  )
+
   const activeCredits = creditsData?.data?.credits || []
+  const reputationScore = reputationData?.data?.reputation?.reputation_score ?? null
+  const reputationTier = reputationData?.data?.reputation?.tier ?? null
+
+  const getRepScoreColor = (score: number | null) => {
+    if (score === null) return 'text-muted-foreground'
+    if (score >= 700) return 'text-emerald-600 dark:text-emerald-400'
+    if (score >= 550) return 'text-amber-600 dark:text-amber-400'
+    return 'text-red-600 dark:text-red-400'
+  }
 
   const formatAmount = (amount: number) => {
     return formatNPR(amount)
@@ -162,21 +177,6 @@ export default function BorrowerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Active Credits
-              </CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.data?.activeCreditsCount || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Need attention
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
                 Completed Payments
               </CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
@@ -188,6 +188,26 @@ export default function BorrowerDashboard() {
               </p>
             </CardContent>
           </Card>
+
+          {/* Reputation Score Card */}
+          <Link href="/borrower/profile?tab=reputation">
+            <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Reputation Score
+                </CardTitle>
+                <Award className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${getRepScoreColor(reputationScore)}`}>
+                  {reputationScore ?? '—'}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {reputationTier ?? 'Loading...'} · View details →
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Main Content Tabs */}
