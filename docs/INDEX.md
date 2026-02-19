@@ -37,6 +37,7 @@ Complete guide to all documentation files.
 |------|---------|--------|
 | **README.md** | Complete project overview | 344 lines |
 | **structure.md** | Architecture and system design | Updated |
+| **AUTHENTICATION.md** | Wallet auth & session management | 300+ lines |
 | **DATABASE_SETUP.md** | Manual database setup guide | 147 lines |
 | **STRIPE_SETUP.md** | Stripe configuration guide | 247 lines |
 | **TESTING_GUIDE.md** | Complete testing procedures | 379 lines |
