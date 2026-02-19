@@ -13,10 +13,10 @@ import { createCreditNFT } from '@/lib/solana/credit-nft'
  * 3. Stores NFT mint address in database
  * 4. Sets approved_at timestamp
  */
-async function handler(req: NextRequest, { params }: { params: { id: string } }) {
+async function handler(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = (req as any).user
-    const creditId = params.id
+    const { id: creditId } = await params
 
     // Get credit entry
     const credit = await getCreditEntryById(creditId)

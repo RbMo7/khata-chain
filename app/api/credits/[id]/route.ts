@@ -8,11 +8,11 @@ import { getCreditEntryWithDetails } from '@/lib/services'
  */
 async function handler(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = (req as any).user
-    const creditId = context.params.id
+    const { id: creditId } = await context.params
 
     if (!creditId) {
       return errorResponse('Credit ID is required', 400)

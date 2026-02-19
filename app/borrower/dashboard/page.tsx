@@ -1,6 +1,7 @@
 'use client'
 
 import { DashboardLayout } from '@/components/DashboardLayout'
+import { PendingCreditsActions } from '@/components/PendingCreditsActions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -105,6 +106,9 @@ export default function BorrowerDashboard() {
   return (
     <DashboardLayout userType="borrower">
       <div className="space-y-8">
+        {/* Pending Credits Alert - HIGH PRIORITY */}
+        <PendingCreditsActions />
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>

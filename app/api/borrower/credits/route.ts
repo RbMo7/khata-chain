@@ -5,15 +5,18 @@ import { getBorrowerCredits } from '@/lib/services'
 /**
  * GET /api/borrower/credits
  * Get borrower's credits
- * Query params: status (optional) - 'active' | 'overdue' | 'paid' | 'all'
+ * Query params: status (optional) - 'pending_approval' | 'active' | 'completed' | 'overdue' | 'cancelled' | 'rejected' | 'all'
  */
 async function handler(req: NextRequest) {
   try {
     const user = (req as any).user
     const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status') as any || 'all'
+    const status = searchParams.get('status') || 'all'
 
-    const credits = await getBorrowerCredits(user.walletAddress, status)
+    // Pass undefined for status if 'all', otherwise pass the specific status
+    const filterStatus = status === 'all' ? undefined : status
+
+    const credits = await getBorrowerCredits(user.walletAddress, filterStatus as any)
 
     return successResponse({
       credits,

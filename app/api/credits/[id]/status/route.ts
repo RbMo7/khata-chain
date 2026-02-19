@@ -9,11 +9,11 @@ import { getCreditEntryById, updateCreditStatus } from '@/lib/services'
  */
 async function handler(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = (req as any).user
-    const creditId = context.params.id
+    const { id: creditId } = await context.params
     const body = await req.json()
     const { status } = body
 

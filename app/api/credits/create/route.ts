@@ -60,7 +60,7 @@ async function handler(req: NextRequest) {
       return errorResponse('Due date must be in the future', 400)
     }
 
-    // Create credit entry
+    // Create credit entry with pending_approval status (waiting for borrower acceptance)
     const credit = await createCreditEntry({
       borrower_pubkey: borrowerPubkey,
       store_owner_pubkey: user.walletAddress,
@@ -68,6 +68,7 @@ async function handler(req: NextRequest) {
       currency,
       description,
       due_date: dueDateObj.toISOString(),
+      status: 'pending_approval', // Explicitly set - waiting for borrower to accept/reject
     })
 
     if (!credit) {

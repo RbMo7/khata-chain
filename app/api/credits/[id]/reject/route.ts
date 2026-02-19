@@ -10,10 +10,10 @@ import { getCreditEntryById, updateCreditStatus } from '@/lib/services'
  *   reason?: string
  * }
  */
-async function handler(req: NextRequest, { params }: { params: { id: string } }) {
+async function handler(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = (req as any).user
-    const creditId = params.id
+    const { id: creditId } = await params
     const body = await req.json().catch(() => ({}))
     const { reason } = body
 

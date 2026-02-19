@@ -53,9 +53,13 @@ CREATE TABLE IF NOT EXISTS credit_entries (
     currency VARCHAR(3) DEFAULT 'NPR',
     description VARCHAR(500),
     created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
     due_date TIMESTAMP,
-    status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'overdue', 'cancelled')),
+    status VARCHAR(50) DEFAULT 'pending_approval' CHECK (status IN ('pending_approval', 'active', 'completed', 'overdue', 'cancelled', 'rejected')),
     nft_mint_address VARCHAR(88),
+    approved_at TIMESTAMP,
+    rejected_at TIMESTAMP,
+    rejection_reason TEXT,
     stripe_repayment_amount BIGINT DEFAULT 0,
     repayment_method VARCHAR(50) DEFAULT 'on_chain' CHECK (repayment_method IN ('on_chain', 'stripe', 'hybrid')),
     stripe_payment_intent_id VARCHAR(255),
@@ -67,6 +71,7 @@ CREATE TABLE IF NOT EXISTS credit_entries (
 CREATE INDEX IF NOT EXISTS idx_credit_borrower ON credit_entries(borrower_pubkey);
 CREATE INDEX IF NOT EXISTS idx_credit_store_owner ON credit_entries(store_owner_pubkey);
 CREATE INDEX IF NOT EXISTS idx_credit_status ON credit_entries(status);
+CREATE INDEX IF NOT EXISTS idx_credit_pending_approval ON credit_entries(borrower_pubkey, status) WHERE status = 'pending_approval';
 CREATE INDEX IF NOT EXISTS idx_credit_created ON credit_entries(created_at);
 CREATE INDEX IF NOT EXISTS idx_credit_due_date ON credit_entries(due_date);
 
