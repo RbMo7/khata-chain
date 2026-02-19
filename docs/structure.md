@@ -709,11 +709,11 @@ On-Chain Reputation Update              Solana Program              Frontend
 - No collection-level metadata
 - No bulk minting/airdropping
 
-### ❌ Payment Integration
-- No Stripe/payment processor integration
-- No on/off-ramp solutions
-- No fiat bridge
-- No USD conversion on-chain
+### ✅ Payment Integration (NEW)
+- **Stripe Connect** for store owners to accept fiat payments
+- **Hybrid repayment model**: Borrowers can pay via Solana tokens OR Stripe
+- **Webhook-based confirmation** ensures on-chain updates only after payment succeeds
+- **No fiat bridge on-chain** (Stripe handles settlement separately)
 
 ### ❌ Mobile App
 - MVP is web-only (Next.js)
@@ -735,6 +735,12 @@ On-Chain Reputation Update              Solana Program              Frontend
 - No rating/review system
 - No borrower-to-borrower interactions
 
+### ✅ Citizenship Number Verification (NEW)
+- **Unique constraint** on citizenship hash (one per person)
+- **Prevents duplicate accounts** across multiple wallets/emails
+- **Privacy-preserving** (stores SHA-256 hash, not plaintext)
+- **Immutable** after registration (cannot change ID)
+
 ### ❌ Wallet Recovery
 - No built-in key recovery (if user loses key, account is inaccessible)
 - Future feature only
@@ -748,15 +754,16 @@ On-Chain Reputation Update              Solana Program              Frontend
 
 ## Summary
 
-This document defines the complete architecture of KhataChain MVP without implementation code. 
+This document defines the complete architecture of KhataChain MVP. 
 
 **Key Takeaways:**
 1. **Solana Program** handles all credit logic, soulbound NFT minting, and reputation calculations
 2. **Soulbound NFT** proves borrower identity and reputation (non-transferable, metadata-driven)
-3. **Next.js Frontend** allows store owners to manage borrowers and borrowers to view their reputation
-4. **Supabase Indexing** provides fast query access to borrower data, credit history, and reputation
-5. **Security-first** design: PDAs, signer verification, NonTransferable tokens prevent abuse
-6. **Narrow scope** ensures MVP is deliverable: no DeFi, no complex identity, no ML, no off-chain reputation logic
+3. **Citizenship Verification** prevents duplicate accounts (one person = one account)
+4. **Stripe Integration** enables fiat payment settlement while keeping reputation on-chain
+5. **Next.js Frontend** allows store owners to manage borrowers and borrowers to repay via multiple methods
+6. **Supabase Indexing** provides fast query access to borrower data, credit history, payments, and reputation
+7. **Security-first** design: PDAs, citizenship hashing, webhook verification, PCI compliance
 
 ---
 
