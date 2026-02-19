@@ -8,7 +8,7 @@ import { authenticateWallet } from '@/lib/services'
  * Get current authenticated user's profile
  * Requires: Authorization header with wallet address
  */
-async function GET(req: NextRequest) {
+async function handler(req: NextRequest) {
   try {
     const user = (req as any).user // Attached by withAuth middleware
 
@@ -29,6 +29,4 @@ async function GET(req: NextRequest) {
   }
 }
 
-export { GET }
-export const GET_PROTECTED = withAuth(GET)
-export { GET_PROTECTED as GET }
+export const GET = withAuth(handler)

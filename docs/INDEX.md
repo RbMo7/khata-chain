@@ -4,17 +4,24 @@ Complete guide to all documentation files.
 
 ## 🆕 What's New
 
-**Supabase Integration Complete!** (Just Added)
+**Phase 1 Complete: Supabase Integration** ✅
 - ✅ Database connection configured (client + server)
 - ✅ Complete TypeScript type definitions (500+ lines)
 - ✅ 6 comprehensive service modules (auth, borrowers, store-owners, credit-entries, citizenship, stripe)
 - ✅ Auth middleware with route protection
-- ✅ Test endpoints ready: `/api/test/db` and `/api/test/auth`
 
-**Start Testing:**
-1. Read: [TESTING_SUPABASE.md](./TESTING_SUPABASE.md) - Step-by-step testing guide
-2. Use: [SERVICES_REFERENCE.md](./SERVICES_REFERENCE.md) - Quick API reference
-3. Docs: [SUPABASE_INTEGRATION.md](./SUPABASE_INTEGRATION.md) - Complete integration guide
+**Phase 2 Complete: Production API Routes** ✅
+- ✅ 15+ production-ready API endpoints
+- ✅ Full CRUD for borrowers, store owners, and credits
+- ✅ Integrated Stripe payment processing
+- ✅ Citizenship verification endpoints
+- ✅ Search and filtering capabilities
+
+**Ready for Integration:**
+1. **API Reference:** [API_ROUTES.md](./API_ROUTES.md) - Complete endpoint documentation
+2. **Testing Guide:** [TESTING_SUPABASE.md](./TESTING_SUPABASE.md) - Test all endpoints
+3. **Services Reference:** [SERVICES_REFERENCE.md](./SERVICES_REFERENCE.md) - Backend services
+4. **Integration Guide:** [SUPABASE_INTEGRATION.md](./SUPABASE_INTEGRATION.md) - How to use
 
 ---
 
@@ -28,11 +35,12 @@ Complete guide to all documentation files.
 ### For Developers
 1. Architecture: **docs/structure.md**
 2. Implementation: **docs/IMPLEMENTATION_SUMMARY.md**
-3. **Database Integration: docs/SUPABASE_INTEGRATION.md** 📘
-4. **Testing Database: docs/TESTING_SUPABASE.md** ✅
-5. **Services Reference: docs/SERVICES_REFERENCE.md** 📚
-6. Testing: **docs/TESTING_GUIDE.md**
-7. Deployment: **docs/DEPLOYMENT_CHECKLIST.md**
+3. **API Routes: docs/API_ROUTES.md** 🔥 **NEW**
+4. **Database Integration: docs/SUPABASE_INTEGRATION.md** 📘
+5. **Testing Database: docs/TESTING_SUPABASE.md** ✅
+6. **Services Reference: docs/SERVICES_REFERENCE.md** 📚
+7. Testing: **docs/TESTING_GUIDE.md**
+8. Deployment: **docs/DEPLOYMENT_CHECKLIST.md**
 
 ### For DevOps/Infrastructure
 1. Deployment: **docs/DEPLOYMENT_CHECKLIST.md**
@@ -61,6 +69,7 @@ Complete guide to all documentation files.
 | **SUPABASE_INTEGRATION.md** | **NEW:** Supabase services & usage guide | 400+ lines |
 | **TESTING_SUPABASE.md** | **NEW:** Test database connection & services | 350+ lines |
 | **SERVICES_REFERENCE.md** | **NEW:** Quick reference for all services | 450+ lines |
+| **API_ROUTES.md** | **NEW:** Complete API endpoints documentation | 600+ lines |
 | **STRIPE_SETUP.md** | Stripe configuration guide | 247 lines |
 | **TESTING_GUIDE.md** | Complete testing procedures | 379 lines |
 | **DEPLOYMENT_CHECKLIST.md** | Pre/during/post deployment tasks | 323 lines |
@@ -68,7 +77,7 @@ Complete guide to all documentation files.
 | **CITIZENSHIP.md** | Citizenship feature details | (referenced) |
 | **INDEX.md** | This file | - |
 
-**Total Documentation:** 3,200+ lines
+**Total Documentation:** 3,800+ lines
 
 ## File Organization
 

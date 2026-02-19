@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+// @ts-ignore - Type import
 import type { Database } from './types'
 
 const supabaseUrl = process.env.SUPABASE_URL!

@@ -141,7 +141,7 @@ export function successResponse(data: any, status = 200) {
  */
 export function getRequestMetadata(req: NextRequest) {
   return {
-    ipAddress: req.ip || req.headers.get('x-forwarded-for') || 'unknown',
+    ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
     userAgent: req.headers.get('user-agent') || 'unknown',
     referer: req.headers.get('referer') || null,
   }
@@ -150,22 +150,21 @@ export function getRequestMetadata(req: NextRequest) {
 /**
  * Validate required fields in request body
  */
-export async function validateRequiredFields(
-  req: NextRequest,
+export function validateRequiredFields(
+  body: any,
   fields: string[]
-): Promise<{ valid: boolean; missing?: string[]; body?: any }> {
-  try {
-    const body = await req.json()
-    const missing = fields.filter((field) => !(field in body) || body[field] === null || body[field] === undefined)
+): { valid: boolean; error?: string; missing?: string[] } {
+  const missing = fields.filter((field) => !(field in body) || body[field] === null || body[field] === undefined)
 
-    if (missing.length > 0) {
-      return { valid: false, missing }
+  if (missing.length > 0) {
+    return { 
+      valid: false, 
+      missing,
+      error: `Missing required fields: ${missing.join(', ')}`
     }
-
-    return { valid: true, body }
-  } catch (error) {
-    return { valid: false }
   }
+
+  return { valid: true }
 }
 
 /**
