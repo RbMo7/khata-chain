@@ -34,6 +34,24 @@ The platform charges no gas fees to borrowers. All SOL transaction costs are cov
 
 ---
 
+## Revenue Model
+
+Every repayment transaction includes a protocol fee of **0.002 SOL**, transferred on-chain from the borrower to the platform fee wallet (`J1NZymvqDBeDaanrDJ2zNLajEoSNsXc2EbRraNEwjp9k`) atomically within the same transaction. This is not a backend charge — it is a hard-coded instruction in the repayment transaction itself, so it executes on-chain with no possibility of being bypassed or reversed. The fee is shown explicitly in the repayment UI before the borrower confirms.
+
+At current SOL prices, 0.002 SOL is roughly $0.30–$0.40 per repayment. On a platform processing 10,000 repayments per month, this generates approximately $3,000–$4,000 in protocol revenue monthly without any subscription, invoice, or payment processor.
+
+The fee also serves a secondary function: it funds the gas relay wallet. The platform spends roughly 0.000005 SOL per relayed transaction in network fees. The protocol fee collected per repayment covers approximately 400 future relay transactions, meaning the platform self-funds its gas costs from usage volume.
+
+Projected additional revenue streams at scale:
+
+- **API access tier for lenders.** Third-party lenders and NGOs querying the reputation API in bulk pay a monthly access fee for rate-limited institutional access.
+- **Verified store badge.** Store owners who want a "KhataChain Verified" badge displayed to borrowers pay a one-time or annual verification fee.
+- **Data analytics (anonymised).** Aggregate repayment patterns, default rates by region, and credit demand data are commercially valuable to microfinance institutions and development banks. Sold in anonymised, aggregated form with no individual data shared.
+
+The core user-facing product (issuing credits, repaying, viewing history) remains free for both borrowers and store owners. Revenue is extracted only at the moment of successful repayment, which aligns the platform's financial incentive with the borrower actually completing their obligation.
+
+---
+
 ## Potential Impact
 
 - Enables informal borrowers to build verifiable credit histories for the first time.
