@@ -10,10 +10,31 @@ import './globals.css'
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://khata-chain.vercel.app'
+
 export const metadata: Metadata = {
-  title: 'KhataChain - Decentralized Credit Network',
-  description: 'Build trust, extend credit, and grow your business on the blockchain',
-  generator: 'v0.app',
+  title: 'KhataChain — On-Chain Credit Bureau',
+  description:
+    'The first decentralized credit bureau for informal economies. Build a tamper-proof credit reputation on Solana — no bank account required.',
+  metadataBase: new URL(APP_URL),
+  openGraph: {
+    title: 'KhataChain — On-Chain Credit Bureau',
+    description:
+      'Build a tamper-proof credit reputation on Solana. No bank account. Just a wallet.',
+    url: APP_URL,
+    siteName: 'KhataChain',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'KhataChain — On-Chain Credit Bureau',
+    description:
+      'Build a tamper-proof credit reputation on Solana. No bank account. Just a wallet.',
+  },
+  keywords: [
+    'Solana', 'credit bureau', 'DeFi', 'microfinance', 'informal economy',
+    'blockchain', 'reputation', 'khata', 'Nepal', 'financial inclusion',
+  ],
   icons: {
     icon: [
       {

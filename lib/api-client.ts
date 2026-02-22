@@ -58,8 +58,6 @@ export async function apiClient<T = any>(
     ? endpoint 
     : `${API_BASE_URL}${endpoint}`;
   
-  console.log('API Request:', { method: options.method || 'GET', url, body: options.body })
-  
   const response = await fetch(url, {
     ...options,
     headers,
@@ -75,8 +73,6 @@ export async function apiClient<T = any>(
     const text = await response.text();
     data = { message: text };
   }
-  
-  console.log('API Response:', { status: response.status, ok: response.ok, data })
   
   if (!response.ok) {
     const message = data.error || data.message || `HTTP ${response.status}`;
