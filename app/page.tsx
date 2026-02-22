@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { ArrowRight, Shield, Zap, ExternalLink, CheckCircle2, Loader2, Search, Activity } from 'lucide-react'
 
 // ── Replace this with your test borrower wallet after first repayment ──────
-const DEMO_WALLET = '2a5PcvWCQAMdvzhnJSbp8xPt2oSS1DwoYU3it2vR8M1M'
+const DEMO_WALLET = 'J1NZymvqDBeDaanrDJ2zNLajEoSNsXc2EbRraNEwjp9k'
 
 const TIER_COLORS: Record<string, string> = {
   Excellent:   'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
