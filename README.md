@@ -261,16 +261,39 @@ Open `http://localhost:3000`.
 
 ---
 
-## Hackathon Alignment
+## Hackathon Track Alignment
 
-This submission addresses the on-chain loyalty and reputation track. The core mechanism — anchoring a cryptographic hash of a user's on-chain behaviour history — is directly analogous to a token extension loyalty system, applied to the credit domain. Rather than token balances growing over time, reputation scores grow with each successful repayment, are committed to the chain at each milestone, and are publicly redeemable for access to credit by presenting the verifiable proof.
+### Customer loyalty program using on-chain token extensions
 
-Key properties that satisfy the on-chain experience requirement:
+This is the closest track to what KhataChain implements, extended into a higher-stakes domain.
 
-- Every repayment produces a real on-chain transaction (SOL transfer, Solana testnet).
-- Every reputation update produces a second on-chain transaction (Memo anchor).
-- Both are publicly verifiable on Solana Explorer with no special tooling.
-- The gas relay means the user never touches SOL directly, providing a native experience for users who do not hold cryptocurrency.
+A loyalty programme tracks a user's positive behaviour over time, commits those points on-chain, and lets the user redeem them for benefits. KhataChain does exactly this with creditworthiness:
+
+- Each on-time repayment increments the borrower's reputation score.
+- The score is committed to Solana as a SHA-256 hash via the Memo program — a tamper-proof, timestamped record of the score at that moment.
+- The accumulated score is "redeemable" in the most economically meaningful way possible: as proof of creditworthiness when applying for the next loan.
+
+The natural extension of this already-working mechanism is to mint an SPL reward token — call it KhataCredit — to the borrower's wallet on each on-time repayment. Tokens accumulate visibly in the wallet. They can be redeemed to reduce the protocol fee on future repayments, request a higher credit limit, or exchanged at participating stores for a discount. The dashboard showing tokens growing over time maps directly onto the borrower's reputation history page that already exists.
+
+The difference between KhataChain and a typical loyalty programme: the stakes are real. A coffee shop loyalty stamp has no consequence if the data is wrong. Here, the on-chain record determines whether a person can access emergency credit. That is why the cryptographic commitment and public verifiability matter.
+
+### Confidential transfer payment demo
+
+Credit amounts are sensitive information in the context of informal economies. A borrower repaying NPR 5,000 to a corner store does not want that amount publicly readable on-chain, particularly in small communities where financial status carries social risk.
+
+The current repayment transaction is a plaintext SOL transfer: the amount is visible to anyone inspecting the transaction on Explorer. The confidential transfer extension solves this directly. The repayment instruction would use a token with the confidential transfer extension enabled, so the amount transferred is encrypted and verifiable only by the two parties involved (borrower and store owner) while the transaction itself is still settled on-chain.
+
+Critically, the reputation hash anchored after repayment would still be computed from the real amount and committed publicly — preserving the auditability of the credit score — while the payment amount itself remains private. This combination (private transaction, public reputation commitment) is not possible with any traditional credit bureau and is a direct result of building on Solana's token extension primitives.
+
+### On-chain native mobile experiences
+
+The gas relay architecture that KhataChain already operates is the foundational requirement for any mobile-native Solana experience. A user who does not hold SOL cannot pay gas fees. The relay removes that requirement entirely: the platform co-signs every transaction as fee payer, and the user's wallet only needs to sign the repayment instruction itself.
+
+The natural mobile-native extension is NFC-triggered repayment. A store owner's device (phone or point-of-sale terminal) broadcasts an NFC payload containing the credit entry ID. The borrower taps their phone, the repayment transaction is pre-populated and presented for confirmation, and a single tap signs and broadcasts the SOL transfer on-chain. The store owner sees the repayment confirmed in real time without typing anything.
+
+A GPS variant is also viable: the system requires that the repayment transaction is signed within a defined geographic radius of the store's registered location, verified server-side before the relay co-signs. This prevents remote repayment fraud where a third party repays on behalf of a borrower who is not physically present (relevant in contexts where debt is transferred or sold informally).
+
+Both of these are direct extensions of the relay and authentication infrastructure that exists today.
 
 ---
 
