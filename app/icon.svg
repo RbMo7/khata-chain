@@ -5,15 +5,10 @@
     </clipPath>
   </defs>
   <g clip-path="url(#bound)">
-    <!-- Background -->
     <rect width="180" height="180" fill="#059669"/>
-    <!-- K: vertical stem -->
     <rect x="42" y="34" width="24" height="112" rx="5" fill="white"/>
-    <!-- K: upper diagonal arm -->
     <polygon points="58,80 126,30 140,51 72,101" fill="white"/>
-    <!-- K: lower diagonal arm -->
     <polygon points="72,79 140,129 126,150 58,100" fill="white"/>
-    <!-- Chain link accent: two interlocked rings bottom-right -->
     <circle cx="126" cy="152" r="10" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="6"/>
     <circle cx="144" cy="152" r="10" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="6"/>
     <rect x="129" y="144" width="12" height="16" fill="#059669"/>
