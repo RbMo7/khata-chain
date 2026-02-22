@@ -285,16 +285,6 @@ The current repayment transaction is a plaintext SOL transfer: the amount is vis
 
 Critically, the reputation hash anchored after repayment would still be computed from the real amount and committed publicly — preserving the auditability of the credit score — while the payment amount itself remains private. This combination (private transaction, public reputation commitment) is not possible with any traditional credit bureau and is a direct result of building on Solana's token extension primitives.
 
-### On-chain native mobile experiences
-
-The gas relay architecture that KhataChain already operates is the foundational requirement for any mobile-native Solana experience. A user who does not hold SOL cannot pay gas fees. The relay removes that requirement entirely: the platform co-signs every transaction as fee payer, and the user's wallet only needs to sign the repayment instruction itself.
-
-The natural mobile-native extension is NFC-triggered repayment. A store owner's device (phone or point-of-sale terminal) broadcasts an NFC payload containing the credit entry ID. The borrower taps their phone, the repayment transaction is pre-populated and presented for confirmation, and a single tap signs and broadcasts the SOL transfer on-chain. The store owner sees the repayment confirmed in real time without typing anything.
-
-A GPS variant is also viable: the system requires that the repayment transaction is signed within a defined geographic radius of the store's registered location, verified server-side before the relay co-signs. This prevents remote repayment fraud where a third party repays on behalf of a borrower who is not physically present (relevant in contexts where debt is transferred or sold informally).
-
-Both of these are direct extensions of the relay and authentication infrastructure that exists today.
-
 ---
 
 ## Deployment
