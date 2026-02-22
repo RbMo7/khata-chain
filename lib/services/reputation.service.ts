@@ -27,6 +27,7 @@
  */
 
 import { supabaseAdmin } from '../supabase/server'
+import { anchorReputationOnChain } from '../solana/anchor-server'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -298,6 +299,33 @@ async function applyDelta(
       console.error('applyDelta update error:', updateErr)
       return null
     }
+
+    // Anchor the new score on-chain (non-blocking — never fails the score update)
+    const latePayments =
+      ((updated as any).late_payments_minor ?? 0) +
+      ((updated as any).late_payments_major ?? 0) +
+      ((updated as any).late_payments_severe ?? 0)
+    anchorReputationOnChain({
+      walletAddress: borrowerPubkey,
+      score: scoreAfter,
+      totalCredits: (updated as any).total_credits ?? 0,
+      onTimePayments: (updated as any).on_time_payments ?? 0,
+      latePayments,
+    })
+      .then(({ hash, txSignature }) => {
+        supabaseAdmin
+          .from('borrower_reputation')
+          .update({
+            reputation_hash: hash,
+            reputation_hash_tx: txSignature,
+            reputation_anchored_at: new Date().toISOString(),
+          })
+          .eq('borrower_pubkey', borrowerPubkey)
+          .then(() => {})
+      })
+      .catch((err) =>
+        console.warn('[reputation] on-chain anchor failed (non-fatal):', err?.message)
+      )
 
     // Log event
     const eventInsert: any = {

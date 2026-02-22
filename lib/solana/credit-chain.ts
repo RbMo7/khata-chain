@@ -32,6 +32,23 @@ const MEMO_PROGRAM_ID = new PublicKey(
   'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr'
 )
 
+/**
+ * Platform wallet — pays gas for all Memo txs so users pay $0.
+ * Public key of PLATFORM_KEYPAIR_SECRET in .env
+ */
+const PLATFORM_PUBKEY =
+  process.env.NEXT_PUBLIC_PLATFORM_SOLANA_PUBKEY ??
+  'EWhDaoqMtEJs6qRSaixiaXZkDTkoA3ZoxfmjTSuzMAC6'
+
+/**
+ * 0.002 SOL protocol fee on every repayment — covers gas costs + platform revenue.
+ * Goes to the NEXT_PUBLIC_PROTOCOL_FEE_RECIPIENT address.
+ */
+export const PROTOCOL_FEE_SOL = 0.002
+export const PROTOCOL_FEE_RECIPIENT =
+  process.env.NEXT_PUBLIC_PROTOCOL_FEE_RECIPIENT ??
+  '2a5PcvWCQAMdvzhnJSbp8xPt2oSS1DwoYU3it2vR8M1M'
+
 type SendTransactionFn = (
   tx: Transaction,
   connection: Connection
@@ -79,6 +96,28 @@ async function sendAndConfirm(
   )
 
   return signature
+}
+
+/**
+ * Like sendAndConfirm but the PLATFORM wallet is the fee payer — the user
+ * pays $0 gas.  The sendTransaction fn must be buildRelayFn() from the hook,
+ * which signs with the user's wallet then POSTs to /api/solana/relay.
+ * The relay co-signs as fee payer, broadcasts, confirms, and returns the sig.
+ */
+async function sendViaRelay(
+  tx: Transaction,
+  signerPubkeyStr: string,
+  sendTransaction: SendTransactionFn
+): Promise<string> {
+  const connection = getConnection()
+
+  const { blockhash } = await connection.getLatestBlockhash()
+  tx.recentBlockhash = blockhash
+  tx.feePayer = new PublicKey(PLATFORM_PUBKEY) // platform pays gas!
+
+  // sendTransaction here is buildRelayFn — it signs + relays in one call
+  // and returns the confirmed tx signature from the relay API.
+  return sendTransaction(tx, connection)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -133,7 +172,7 @@ export async function anchorCreditOnChain(
     buildMemoInstruction(memo, new PublicKey(signerPubkey))
   )
 
-  return sendAndConfirm(tx, signerPubkey, sendTransaction)
+  return sendViaRelay(tx, signerPubkey, sendTransaction)
 }
 
 export interface RepaymentAnchorParams {
@@ -178,7 +217,7 @@ export async function anchorRepaymentOnChain(
     buildMemoInstruction(memo, new PublicKey(borrowerPubkey))
   )
 
-  return sendAndConfirm(tx, borrowerPubkey, sendTransaction)
+  return sendViaRelay(tx, borrowerPubkey, sendTransaction)
 }
 
 /**
@@ -277,12 +316,21 @@ export async function sendSolPayment(params: SolPaymentParams): Promise<string> 
 
   const tx = new Transaction()
 
-  // Real SOL transfer
+  // Real SOL transfer: borrower → store owner
   tx.add(
     SystemProgram.transfer({
       fromPubkey: sender,
       toPubkey:   recipient,
       lamports,
+    })
+  )
+
+  // Protocol fee: 0.002 SOL → platform owner (covers relay gas costs + revenue)
+  tx.add(
+    SystemProgram.transfer({
+      fromPubkey: sender,
+      toPubkey:   new PublicKey(PROTOCOL_FEE_RECIPIENT),
+      lamports:   Math.round(PROTOCOL_FEE_SOL * LAMPORTS_PER_SOL),
     })
   )
 

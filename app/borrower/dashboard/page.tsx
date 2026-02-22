@@ -22,6 +22,7 @@ import {
   Loader2,
   Award,
   Calendar,
+  Share2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
@@ -250,6 +251,29 @@ export default function BorrowerDashboard() {
             </Card>
           </Link>
         </div>
+
+        {/* Share reputation CTA */}
+        {user?.walletAddress && (
+          <Card className="border-dashed">
+            <CardContent className="py-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary/10">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Share your reputation</p>
+                  <p className="text-xs text-muted-foreground">Let lenders and merchants verify your credit score publicly</p>
+                </div>
+              </div>
+              <Link href={`/verify?wallet=${user.walletAddress}`} target="_blank">
+                <Button variant="outline" size="sm" className="gap-2 shrink-0">
+                  <Share2 className="h-3.5 w-3.5" />
+                  Open verifier
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="active" className="space-y-4">

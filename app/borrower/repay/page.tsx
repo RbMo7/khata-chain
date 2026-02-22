@@ -17,7 +17,7 @@ import { useApi } from '@/hooks/use-api';
 import { creditApi, post } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnChainAnchor } from '@/hooks/use-on-chain-anchor';
-import { fetchSolPrice } from '@/lib/solana/credit-chain';
+import { fetchSolPrice, PROTOCOL_FEE_SOL } from '@/lib/solana/credit-chain';
 
 type SolPriceData = { solUSD: number; nprPerUsd: number; solPriceNPR: number; fallback?: boolean }
 
@@ -364,7 +364,7 @@ export default function BorrowerRepayPage() {
           </CardHeader>
           <CardContent className="space-y-4">
 
-            {/* Amount breakdown: NPR → USD → SOL */}
+            {/* Amount breakdown: NPR → USD → SOL + fee */}
             <div className="rounded-lg border divide-y text-sm">
               <div className="flex justify-between items-center px-4 py-3">
                 <span className="text-muted-foreground">Amount (NPR)</span>
@@ -391,24 +391,37 @@ export default function BorrowerRepayPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center px-4 py-3">
-                    <span className="font-medium">You pay</span>
-                    <span className="font-bold text-lg font-mono">
+                    <span className="text-muted-foreground text-sm">To store owner</span>
+                    <span className="font-mono text-sm">
                       ◊ {(credit.credit_amount / 100 / priceData.solPriceNPR).toFixed(6)} SOL
                     </span>
                   </div>
                 </>
               ) : (
                 <div className="flex justify-between items-center px-4 py-3">
-                  <span className="font-medium">You pay (fallback rate)</span>
-                  <span className="font-bold text-lg font-mono">
+                  <span className="text-muted-foreground text-sm">To store owner (fallback rate)</span>
+                  <span className="font-mono text-sm">
                     ◊ {(credit.credit_amount / 100 / (88 * 135.5)).toFixed(6)} SOL
                   </span>
                 </div>
               )}
 
               <div className="flex justify-between items-center px-4 py-2 text-xs text-muted-foreground">
-                <span>Network fee</span>
-                <span className="font-mono">∼0.000005 SOL (paid by you)</span>
+                <span>Platform fee</span>
+                <span className="font-mono">◊ {PROTOCOL_FEE_SOL} SOL</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2 text-xs text-emerald-600">
+                <span>Network gas</span>
+                <span className="font-medium">FREE — paid by KhataChain</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-3 bg-muted/30">
+                <span className="font-semibold">Total you pay</span>
+                <span className="font-bold text-lg font-mono">
+                  ◊ {priceData
+                    ? (credit.credit_amount / 100 / priceData.solPriceNPR + PROTOCOL_FEE_SOL).toFixed(6)
+                    : (credit.credit_amount / 100 / (88 * 135.5) + PROTOCOL_FEE_SOL).toFixed(6)
+                  } SOL
+                </span>
               </div>
               <div className="flex justify-between items-center px-4 py-2 text-xs text-muted-foreground">
                 <span>Recipient</span>
@@ -462,7 +475,7 @@ export default function BorrowerRepayPage() {
                 <>
                   <Wallet className="h-4 w-4" />
                   Pay{priceData
-                    ? ` ◊ ${(credit.credit_amount / 100 / priceData.solPriceNPR).toFixed(6)} SOL`
+                    ? ` ◊ ${(credit.credit_amount / 100 / priceData.solPriceNPR + PROTOCOL_FEE_SOL).toFixed(6)} SOL`
                     : ' with SOL'}
                 </>
               )}

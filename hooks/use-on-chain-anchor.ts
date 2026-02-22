@@ -40,8 +40,35 @@ function getInjectedProvider(walletType: string): any | null {
 }
 
 /**
- * Build a SendTransactionFn compatible with credit-chain.ts that uses the
- * injected wallet provider to sign and send the transaction.
+ * Build a SendTransactionFn that signs with the user's wallet, then relays to
+ * the server (which co-signs as fee payer and broadcasts).
+ *
+ * Used for Memo-only txs (credit anchor, repayment anchor) so the user pays $0 gas.
+ */
+function buildRelayFn(provider: any) {
+  return async (tx: Transaction, _connection: Connection): Promise<string> => {
+    // User signs — Phantom / Solflare popup appears
+    const signed: Transaction = await provider.signTransaction(tx)
+
+    // Send the partially-signed tx to the relay API.
+    // The relay validates it's Memo-only, co-signs as fee payer, broadcasts + confirms.
+    const raw = signed.serialize({ requireAllSignatures: false })
+    const res = await fetch('/api/solana/relay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tx: Buffer.from(raw).toString('base64') }),
+    })
+    const json = await res.json()
+    if (!res.ok || !json.txSignature) {
+      throw new Error(json?.error ?? json?.detail ?? 'Relay failed')
+    }
+    return json.txSignature
+  }
+}
+
+/**
+ * Build a SendTransactionFn that signs and broadcasts directly.
+ * Used for SOL payment transactions where the borrower is the fee payer.
  */
 function buildSendFn(provider: any) {
   return async (tx: Transaction, connection: Connection): Promise<string> => {
@@ -82,7 +109,7 @@ export function useOnChainAnchor() {
           borrowerPubkey,
           storeOwnerPubkey,
           signerPubkey,
-          sendTransaction: buildSendFn(provider),
+          sendTransaction: buildRelayFn(provider), // platform pays gas
         })
 
         const res = await post<{ data: AnchorResult }>('/api/solana/record-tx', {
@@ -124,7 +151,7 @@ export function useOnChainAnchor() {
           currency,
           remainingBalance,
           borrowerPubkey,
-          sendTransaction: buildSendFn(provider),
+          sendTransaction: buildRelayFn(provider), // platform pays gas
         })
 
         const res = await post<{ data: AnchorResult }>('/api/solana/record-tx', {
