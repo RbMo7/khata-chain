@@ -79,11 +79,11 @@ export async function apiClient<T = any>(
   console.log('API Response:', { status: response.status, ok: response.ok, data })
   
   if (!response.ok) {
-    const error: ApiError = {
-      error: data.error || data.message || `HTTP ${response.status}`,
-      details: data,
-    };
-    throw error;
+    const message = data.error || data.message || `HTTP ${response.status}`;
+    const err = new Error(message) as Error & ApiError;
+    err.error = message;
+    err.details = data;
+    throw err;
   }
   
   return data;

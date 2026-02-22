@@ -170,7 +170,7 @@ export default function SelectRole() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
-                  <span>Accept fiat payments via Stripe</span>
+                  <span>Accept repayments directly to your wallet</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-chart-2 mt-0.5 flex-shrink-0" />
@@ -181,7 +181,7 @@ export default function SelectRole() {
               <Alert className="mt-4">
                 <Info className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  You can add Stripe Connect later to accept fiat repayments
+                  Borrowers repay directly to your Solana wallet — no middlemen, instant settlement
                 </AlertDescription>
               </Alert>
             </CardContent>

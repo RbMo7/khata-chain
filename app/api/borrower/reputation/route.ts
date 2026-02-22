@@ -7,7 +7,6 @@ import {
   getReputationTier,
   isLowScore,
   calculateProjectedScores,
-  processOverduePenalties,
 } from '@/lib/services/reputation.service'
 import { getBorrowerCredits, markOverdueCredits } from '@/lib/services/credit-entries.service'
 
@@ -39,17 +38,6 @@ async function handler(req: NextRequest) {
 
     // Fetch active credits to generate per-credit projections
     const activeCredits = await getBorrowerCredits(borrowerPubkey, 'active')
-
-    // Process daily overdue penalties (fire-and-forget, non-blocking)
-    const overdueCredits = await getBorrowerCredits(borrowerPubkey, 'overdue')
-    if (overdueCredits.length > 0) {
-      processOverduePenalties(
-        borrowerPubkey,
-        overdueCredits.map((c) => ({ id: c.id, due_date: c.due_date as string | null }))
-      ).catch((err) =>
-        console.error('[Reputation API] processOverduePenalties error (non-fatal):', err)
-      )
-    }
 
     const projections = activeCredits.map((credit) => ({
       credit_id: credit.id,

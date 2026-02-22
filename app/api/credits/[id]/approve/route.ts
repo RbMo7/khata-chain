@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
 import { getCreditEntryById, updateCreditStatus, getBorrowerByPubkey } from '@/lib/services'
-import { createCreditNFT } from '@/lib/solana/credit-nft'
 import { onCreditAccepted } from '@/lib/services/reputation.service'
 
 /**
@@ -44,28 +43,11 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ id: str
       return errorResponse(`Cannot approve credit with status: ${credit.status}`, 400)
     }
 
-    // Create Solana smart contract (NFT minting)
-    let nftMintAddress: string | undefined
-    try {
-      nftMintAddress = await createCreditNFT({
-        borrowerPubkey: credit.borrower_pubkey,
-        storeOwnerPubkey: credit.store_owner_pubkey,
-        amount: credit.credit_amount,
-        dueDate: credit.due_date,
-        creditId: credit.id,
-        description: credit.description
-      })
-      console.log(`[Approve Credit] Created NFT: ${nftMintAddress}`)
-    } catch (nftError) {
-      console.error('[Approve Credit] NFT creation failed:', nftError)
-      // Continue without NFT for now - it can be created later
-      // In production, you may want to fail the approval if NFT creation is critical
-    }
-
     // Update credit status to active
+    // Note: on-chain Memo anchoring happens client-side via useOnChainAnchor()
+    //       after this API returns, because it requires the user's wallet to sign.
     const updatedCredit = await updateCreditStatus(creditId, 'active', {
       approved_at: new Date().toISOString(),
-      nft_mint_address: nftMintAddress
     })
 
     if (!updatedCredit) {
@@ -82,7 +64,6 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ id: str
     return successResponse({
       credit: updatedCredit,
       message: 'Credit approved successfully',
-      nftMintAddress: nftMintAddress,
     })
   } catch (error) {
     console.error('[Approve Credit] Error:', error)

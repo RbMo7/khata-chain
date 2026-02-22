@@ -311,7 +311,10 @@ async function applyDelta(
     if (creditEntryId) eventInsert.credit_entry_id = creditEntryId
     if (paymentOffsetDays !== undefined) eventInsert.payment_offset_days = paymentOffsetDays
 
-    await supabaseAdmin.from('reputation_events').insert(eventInsert)
+    const { error: eventErr } = await supabaseAdmin.from('reputation_events').insert(eventInsert)
+    if (eventErr) {
+      console.error('applyDelta – event insert failed (score was already updated):', JSON.stringify(eventErr))
+    }
 
     return updated as ReputationRecord
   } catch (err) {
@@ -526,6 +529,13 @@ export async function processOverduePenalties(
   if (!overdueCredits.length) return
 
   const now = new Date()
+  // Use start-of-today (UTC) as the idempotency boundary
+  const todayStart = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    0, 0, 0, 0
+  ))
 
   for (const credit of overdueCredits) {
     if (!credit.due_date) continue
@@ -547,23 +557,18 @@ export async function processOverduePenalties(
       deltaKey = 'credit_overdue_daily_tier3'
     }
 
-    // Check when we last penalised this credit
-    const { data: lastEvent } = await supabaseAdmin
+    // Idempotency: skip if already penalised for this credit today (UTC)
+    const { data: todayEvent } = await supabaseAdmin
       .from('reputation_events')
-      .select('created_at')
+      .select('id')
       .eq('borrower_pubkey', borrowerPubkey)
       .eq('credit_entry_id', credit.id)
       .eq('event_type', 'credit_overdue_daily')
-      .order('created_at', { ascending: false })
+      .gte('created_at', todayStart.toISOString())
       .limit(1)
       .maybeSingle()
 
-    if (lastEvent?.created_at) {
-      const lastPenaltyAt = new Date(lastEvent.created_at)
-      const hoursSince =
-        (now.getTime() - lastPenaltyAt.getTime()) / (1000 * 60 * 60)
-      if (hoursSince < 23) continue // already penalised today
-    }
+    if (todayEvent) continue // already applied today
 
     const delta = SCORE_DELTAS[deltaKey]
     const description = `Day ${daysOverdue} overdue (${delta} pts)`

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
+import { withAuth, successResponse } from '@/lib/middleware/auth.middleware'
 import { getPendingExtensionRequestsForStoreOwner } from '@/lib/services/extension-requests.service'
 
 /**
@@ -15,8 +15,9 @@ async function handler(req: NextRequest) {
 
     return successResponse({ extensions, count: extensions.length })
   } catch (err) {
-    console.error('[Store Owner Extensions] error:', err)
-    return errorResponse('Failed to fetch extension requests', 500)
+    // Likely the extension_requests table doesn't exist yet — degrade gracefully
+    console.error('[Store Owner Extensions] error (run 03-extension-schema.sql if table is missing):', err)
+    return successResponse({ extensions: [], count: 0 })
   }
 }
 

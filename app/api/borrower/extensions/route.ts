@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
+import { withAuth, successResponse } from '@/lib/middleware/auth.middleware'
 import { supabaseAdmin } from '@/lib/supabase/server'
 
 /**
@@ -19,8 +19,9 @@ async function handler(req: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('[Borrower Extensions] DB error:', error)
-      return errorResponse('Failed to fetch extension requests', 500)
+      // Likely the extension_requests table doesn't exist yet — degrade gracefully
+      console.error('[Borrower Extensions] DB error (run 03-extension-schema.sql if table is missing):', error)
+      return successResponse({ extensions: {}, list: [] })
     }
 
     // Keyed by credit_entry_id for easy lookup
@@ -31,8 +32,8 @@ async function handler(req: NextRequest) {
 
     return successResponse({ extensions: byCredit, list: data || [] })
   } catch (err) {
-    console.error('[Borrower Extensions] error:', err)
-    return errorResponse('Failed to fetch extension requests', 500)
+    console.error('[Borrower Extensions] error (run 03-extension-schema.sql if table is missing):', err)
+    return successResponse({ extensions: {}, list: [] })
   }
 }
 

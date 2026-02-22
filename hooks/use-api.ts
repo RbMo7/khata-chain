@@ -3,7 +3,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { ApiError } from '@/lib/api-client';
 
 export interface UseApiState<T> {
   data: T | null;
@@ -30,8 +29,11 @@ export function useApi<T = any>(
       const result = await apiCall();
       setData(result);
     } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.error || 'An error occurred');
+      const message =
+        (err as any)?.error ||
+        (err instanceof Error ? err.message : null) ||
+        'An error occurred';
+      setError(message);
       console.error('API Error:', err);
     } finally {
       setLoading(false);
@@ -70,9 +72,11 @@ export function useMutation<TData = any, TVariables = any>() {
         setData(result);
         return result;
       } catch (err) {
-        const apiError = err as ApiError;
-        const errorMessage = apiError.error || 'An error occurred';
-        setError(errorMessage);
+        const message =
+          (err as any)?.error ||
+          (err instanceof Error ? err.message : null) ||
+          'An error occurred';
+        setError(message);
         console.error('Mutation Error:', err);
         throw err;
       } finally {
@@ -118,8 +122,11 @@ export function usePaginatedApi<T = any>(
       setData(result.data);
       setTotal(result.total);
     } catch (err) {
-      const apiError = err as ApiError;
-      setError(apiError.error || 'An error occurred');
+      const message =
+        (err as any)?.error ||
+        (err instanceof Error ? err.message : null) ||
+        'An error occurred';
+      setError(message);
       console.error('API Error:', err);
     } finally {
       setLoading(false);

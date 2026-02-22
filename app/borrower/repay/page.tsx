@@ -1,19 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { StripeCheckoutForm } from '@/components/StripeCheckoutForm';
-import { Loader2, CreditCard, CheckCircle2, AlertCircle, ArrowLeft, Calendar, Store, Info } from 'lucide-react';
+import {
+  Loader2, CheckCircle2, AlertCircle, ArrowLeft, Calendar, Store, Info,
+  ExternalLink, Wallet, Lock, RefreshCw
+} from 'lucide-react';
 import Link from 'next/link';
 import { formatNPR, formatDateNP } from '@/lib/currency-utils';
 import { useApi } from '@/hooks/use-api';
-import { creditApi } from '@/lib/api-client';
+import { creditApi, post } from '@/lib/api-client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOnChainAnchor } from '@/hooks/use-on-chain-anchor';
+import { fetchSolPrice } from '@/lib/solana/credit-chain';
+
+type SolPriceData = { solUSD: number; nprPerUsd: number; solPriceNPR: number; fallback?: boolean }
 
 function getDaysInfo(dueDate: string) {
   const due = new Date(dueDate);
@@ -29,7 +35,29 @@ export default function BorrowerRepayPage() {
   const searchParams = useSearchParams();
   const creditEntryId = searchParams.get('credit_entry_id');
 
-  const [showCheckout, setShowCheckout] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [txExplorerUrl, setTxExplorerUrl] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [priceData, setPriceData] = useState<SolPriceData | null>(null);
+  const [priceLoading, setPriceLoading] = useState(true);
+  const [priceFailed, setPriceFailed] = useState(false);
+
+  const { user } = useAuth();
+  const { payWithSol } = useOnChainAnchor();
+
+  const loadPrice = () => {
+    setPriceLoading(true);
+    setPriceFailed(false);
+    fetchSolPrice().then((data) => {
+      setPriceData(data);
+      setPriceFailed(!data);
+      setPriceLoading(false);
+    });
+  };
+
+  // Fetch live price on mount
+  useEffect(() => { loadPrice(); }, []);
 
   const { data: res, loading, error } = useApi(
     () => creditApi.getById(creditEntryId!),
@@ -81,7 +109,8 @@ export default function BorrowerRepayPage() {
   const credit = res.data;
   const isPaid =
     credit.status === 'completed' ||
-    credit.repayment_status === 'completed';
+    credit.repayment_status === 'completed' ||
+    confirmed;
   const isCancelled = credit.status === 'cancelled' || credit.status === 'rejected';
   const storeName = credit.store_owners?.store_name ?? credit.store_owner_pubkey;
   const daysInfo = credit.due_date ? getDaysInfo(credit.due_date) : null;
@@ -128,6 +157,18 @@ export default function BorrowerRepayPage() {
                   </div>
                 )}
               </div>
+              {txExplorerUrl && (
+                <a
+                  href={txExplorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-emerald-700 underline font-medium"
+                >
+                  View repayment proof on Solana Explorer
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+
               <Link href="/borrower/credits">
                 <Button variant="outline" className="mt-2">View All Credits</Button>
               </Link>
@@ -184,6 +225,46 @@ export default function BorrowerRepayPage() {
     );
   }
 
+  // ── SOL payment handler ─────────────────────────────────────────────────────
+  async function handlePayWithSol() {
+    setPaying(true);
+    setPayError(null);
+
+    try {
+      // If we already fetched the price, pass the pre-calculated SOL amount
+      // so the hook doesn't need to fetch it again during the transaction.
+      // credit_amount is in paisa — divide by 100 for NPR, then convert to SOL.
+      const amountNPR = credit.credit_amount / 100;
+      const overrideAmountSol = priceData
+        ? parseFloat((amountNPR / priceData.solPriceNPR).toFixed(6))
+        : undefined;
+
+      const result = await payWithSol(
+        credit.id,
+        credit.credit_amount,
+        credit.store_owner_pubkey,
+        overrideAmountSol,
+      );
+
+      if (!result) {
+        throw new Error('Payment failed or wallet is not connected. Please connect Phantom / Solflare and try again.');
+      }
+
+      setTxExplorerUrl(result.explorerUrl);
+
+      // Mark credit as paid in DB with the SOL tx signature
+      await post(`/api/credits/${credit.id}/confirm-repayment`, {
+        txSignature: result.txSignature,
+      });
+
+      setConfirmed(true);
+    } catch (err: any) {
+      setPayError(err?.message || 'Payment failed. Please try again.');
+    } finally {
+      setPaying(false);
+    }
+  }
+
   // ── Active / Overdue — show repayment UI ──────────────────────────────────
   return (
     <DashboardLayout userType="borrower">
@@ -200,7 +281,7 @@ export default function BorrowerRepayPage() {
 
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Repay Credit</h1>
-          <p className="text-muted-foreground mt-1">Complete your payment to {storeName}</p>
+          <p className="text-muted-foreground mt-1">Confirm repayment to {storeName}</p>
         </div>
 
         {/* Status alert for overdue */}
@@ -217,7 +298,7 @@ export default function BorrowerRepayPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle>Credit Details</CardTitle>
-            <CardDescription>Review before paying</CardDescription>
+            <CardDescription>Review before confirming</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex justify-between items-center py-1.5 border-b">
@@ -269,48 +350,131 @@ export default function BorrowerRepayPage() {
           </CardContent>
         </Card>
 
-        {/* Payment section */}
-        {!showCheckout ? (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Pay via Stripe</CardTitle>
-              <CardDescription>Credit/Debit card, UPI or Net Banking</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg bg-muted/50 border p-4 flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Total to pay</span>
-                <span className="text-xl font-bold">{formatNPR(credit.credit_amount)}</span>
+        {/* SOL Payment */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              Pay with Solana
+            </CardTitle>
+            <CardDescription>
+              SOL is sent directly from your wallet to the store owner's wallet.
+              Phantom / Solflare will ask you to approve the transaction.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+
+            {/* Amount breakdown: NPR → USD → SOL */}
+            <div className="rounded-lg border divide-y text-sm">
+              <div className="flex justify-between items-center px-4 py-3">
+                <span className="text-muted-foreground">Amount (NPR)</span>
+                <span className="font-bold text-lg">{formatNPR(credit.credit_amount)}</span>
               </div>
-              <Button
-                className="w-full gap-2"
-                size="lg"
-                onClick={() => setShowCheckout(true)}
-              >
-                <CreditCard className="h-4 w-4" />
-                Proceed to Payment
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Complete Payment</CardTitle>
-              <CardDescription>Enter your card details below</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <StripeCheckoutForm
-                creditEntryId={credit.id}
-                amount={credit.credit_amount}
-                currency="INR"
-              />
-            </CardContent>
-          </Card>
-        )}
+
+              {priceLoading ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-3 text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span className="text-sm">Fetching live exchange rate…</span>
+                </div>
+              ) : priceData ? (
+                <>
+                  <div className="flex justify-between items-center px-4 py-2 bg-muted/30">
+                    <span className="text-muted-foreground text-xs">NPR → USD</span>
+                    <span className="font-mono text-xs">
+                      ₹{(credit.credit_amount / 100).toLocaleString()} ÷ {priceData.nprPerUsd.toFixed(2)} = ${(credit.credit_amount / 100 / priceData.nprPerUsd).toFixed(4)} USD
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center px-4 py-2 bg-muted/30">
+                    <span className="text-muted-foreground text-xs">USD → SOL</span>
+                    <span className="font-mono text-xs">
+                      1 SOL = ${priceData.solUSD.toFixed(2)} USD
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center px-4 py-3">
+                    <span className="font-medium">You pay</span>
+                    <span className="font-bold text-lg font-mono">
+                      ◊ {(credit.credit_amount / 100 / priceData.solPriceNPR).toFixed(6)} SOL
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center px-4 py-3">
+                  <span className="font-medium">You pay (fallback rate)</span>
+                  <span className="font-bold text-lg font-mono">
+                    ◊ {(credit.credit_amount / 100 / (88 * 135.5)).toFixed(6)} SOL
+                  </span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center px-4 py-2 text-xs text-muted-foreground">
+                <span>Network fee</span>
+                <span className="font-mono">∼0.000005 SOL (paid by you)</span>
+              </div>
+              <div className="flex justify-between items-center px-4 py-2 text-xs text-muted-foreground">
+                <span>Recipient</span>
+                <span className="font-mono truncate max-w-[180px]">{credit.store_owner_pubkey}</span>
+              </div>
+            </div>
+
+            {priceFailed && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center gap-2">
+                  Could not fetch live rate. Using fallback (1 SOL ≈ $88 · 135.5 NPR/USD = ~₹11,924/SOL).
+                  <button onClick={loadPrice} className="underline inline-flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />Retry
+                  </button>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {priceData?.fallback && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center gap-2">
+                  Using estimated rate — live price unavailable.
+                  <button onClick={loadPrice} className="underline inline-flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />Refresh
+                  </button>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {payError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{payError}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              className="w-full gap-2"
+              size="lg"
+              onClick={handlePayWithSol}
+              disabled={paying || priceLoading}
+            >
+              {paying ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Approve in your wallet…
+                </>
+              ) : (
+                <>
+                  <Wallet className="h-4 w-4" />
+                  Pay{priceData
+                    ? ` ◊ ${(credit.credit_amount / 100 / priceData.solPriceNPR).toFixed(6)} SOL`
+                    : ' with SOL'}
+                </>
+              )}
+            </Button>
+
+          </CardContent>
+        </Card>
 
         {/* Security notice */}
         <div className="flex items-start gap-3 text-sm text-muted-foreground px-1">
-          <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-          <p>Your payment is secured with industry-standard encryption. Card details are never stored on our servers.</p>
+          <Lock className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+          <p>SOL transfers directly from your wallet to the store owner’s wallet on-chain. The transaction is immutable and publicly verifiable on Solana Explorer.</p>
         </div>
 
       </div>

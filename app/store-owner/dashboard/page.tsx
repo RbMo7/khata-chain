@@ -9,14 +9,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   DollarSign,
   Users,
-  CreditCard,
   TrendingUp,
   AlertCircle,
   Plus,
   ArrowUpRight,
   CheckCircle,
   Clock,
-  BarChart3,
   Loader2
 } from 'lucide-react'
 import Link from 'next/link'
@@ -115,14 +113,6 @@ export default function StoreOwnerDashboard() {
             </p>
           </div>
           <div className="flex gap-2">
-            {!stats.stripeConnected && (
-              <Link href="/store-owner/stripe-setup">
-                <Button variant="outline">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Setup Stripe
-                </Button>
-              </Link>
-            )}
             <Link href="/store-owner/create-credit">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -189,35 +179,11 @@ export default function StoreOwnerDashboard() {
             <CardContent>
               <div className="text-2xl font-bold">{formatAmount(stats?.data?.pendingPayment || 0)}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                From Stripe
+                On-chain pending
               </p>
             </CardContent>
           </Card>
         </div>
-
-        {/* Stripe Connection Banner */}
-        {!stats?.data?.stripeConnected && (
-          <Card className="border-chart-2/50 bg-chart-2/5">
-            <CardHeader>
-              <div className="flex items-start gap-4">
-                <AlertCircle className="h-5 w-5 text-chart-2 mt-0.5" />
-                <div className="flex-1">
-                  <CardTitle className="text-lg">Connect Stripe to Accept Payments</CardTitle>
-                  <CardDescription className="mt-1">
-                    Enable your borrowers to repay with fiat currency (UPI, cards, netbanking).
-                    Setup takes less than 5 minutes.
-                  </CardDescription>
-                  <Link href="/store-owner/stripe-setup">
-                    <Button className="mt-4" variant="default">
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Setup Stripe Now
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        )}
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="credits" className="space-y-4">

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { creditApi } from '@/lib/api-client'
+import { useAuth } from '@/contexts/AuthContext'
+import { useOnChainAnchor } from '@/hooks/use-on-chain-anchor'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +37,8 @@ export function PendingCreditsActions() {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
   const [selectedCredit, setSelectedCredit] = useState<CreditRequest | null>(null)
+  const { user } = useAuth()
+  const { anchorCredit } = useOnChainAnchor()
 
   useEffect(() => {
     loadPendingCredits()
@@ -58,6 +62,22 @@ export function PendingCreditsActions() {
     setProcessingId(id)
     try {
       await creditApi.approve(id)
+
+      // Anchor on-chain after DB is updated (non-blocking — won't fail the approval)
+      const credit = credits.find(c => c.id === id)
+      if (credit && user?.walletAddress) {
+        anchorCredit(
+          credit.id,
+          credit.credit_amount,
+          credit.due_date,
+          user.walletAddress,          // borrower is the current user
+          credit.store_owner_pubkey,
+          credit.currency || 'NPR'
+        ).then(result => {
+          if (result) console.log('[On-chain] Credit anchored:', result.explorerUrl)
+        })
+      }
+
       setCredits(credits.filter(c => c.id !== id))
       setSelectedCredit(null)
       setActionType(null)

@@ -16,7 +16,6 @@ import {
   Phone,
   Wallet,
   MapPin,
-  CreditCard,
   Users,
   DollarSign,
   Edit,
@@ -42,7 +41,6 @@ export default function StoreOwnerProfile() {
     state: 'Maharashtra',
     postalCode: '400001',
     businessType: 'Retail - General Store',
-    stripeConnected: true,
     totalBorrowers: 24,
     totalCreditsIssued: 180,
     memberSince: '2024-03-20'
@@ -142,7 +140,7 @@ export default function StoreOwnerProfile() {
           <TabsList>
             <TabsTrigger value="store">Store Info</TabsTrigger>
             <TabsTrigger value="contact">Contact</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="wallet">Wallet</TabsTrigger>
           </TabsList>
 
           <TabsContent value="store" className="space-y-4">
@@ -361,61 +359,36 @@ export default function StoreOwnerProfile() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="payments" className="space-y-4">
+          <TabsContent value="wallet" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Stripe Integration</CardTitle>
+                <CardTitle>Solana Wallet</CardTitle>
                 <CardDescription>
-                  Accept fiat payments from borrowers
+                  Your wallet receives SOL repayments from borrowers directly on-chain.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between p-4 border border-border rounded-lg">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${
-                      profile.stripeConnected ? 'bg-chart-2/10' : 'bg-muted'
-                    }`}>
-                      <CreditCard className={`h-5 w-5 ${
-                        profile.stripeConnected ? 'text-chart-2' : 'text-muted-foreground'
-                      }`} />
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <Wallet className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium">Stripe Status</p>
-                      <p className="text-sm text-muted-foreground">
-                        {profile.stripeConnected ? 'Connected & Active' : 'Not Connected'}
+                      <p className="font-medium">Wallet Address</p>
+                      <p className="text-sm text-muted-foreground font-mono truncate max-w-[220px]">
+                        {profile.walletAddress}
                       </p>
                     </div>
                   </div>
-                  {profile.stripeConnected ? (
-                    <CheckCircle className="h-5 w-5 text-chart-2" />
-                  ) : (
-                    <Badge variant="outline">Disconnected</Badge>
-                  )}
+                  <CheckCircle className="h-5 w-5 text-chart-2" />
                 </div>
 
-                {profile.stripeConnected ? (
-                  <Alert className="bg-chart-2/5 border-chart-2/20">
-                    <CheckCircle className="h-4 w-4 text-chart-2" />
-                    <AlertDescription className="text-chart-2">
-                      Your Stripe account is connected. Borrowers can now repay using UPI, cards, and net banking.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Connect Stripe to enable fiat payments and increase repayment options for your borrowers.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="pt-2">
-                  <Link href="/store-owner/stripe-setup">
-                    <Button variant={profile.stripeConnected ? 'outline' : 'default'} className="w-full">
-                      {profile.stripeConnected ? 'Manage Stripe Account' : 'Connect Stripe'}
-                    </Button>
-                  </Link>
-                </div>
+                <Alert className="bg-chart-2/5 border-chart-2/20">
+                  <CheckCircle className="h-4 w-4 text-chart-2" />
+                  <AlertDescription className="text-chart-2">
+                    Borrowers send SOL directly to this wallet when repaying credits on-chain.
+                  </AlertDescription>
+                </Alert>
               </CardContent>
             </Card>
           </TabsContent>

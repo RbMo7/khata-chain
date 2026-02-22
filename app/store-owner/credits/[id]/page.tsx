@@ -33,12 +33,12 @@ import {
   FileText,
   Loader2,
   AlertCircle,
-  CreditCard,
   Hash,
   TrendingUp,
   Store,
   CalendarClock,
   MessageSquare,
+  ExternalLink,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
@@ -537,25 +537,46 @@ export default function CreditDetailPage() {
                   {credit.repayment_method?.replace('_', ' ') || 'On Chain'}
                 </p>
               </div>
-              {credit.stripe_repayment_amount > 0 && (
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">Stripe Amount</p>
-                  <p className="font-medium">{formatNPR(credit.stripe_repayment_amount)}</p>
-                </div>
-              )}
             </div>
 
-            {credit.nft_mint_address && (
+            {(credit.tx_signature || credit.repayment_tx_signature) && (
               <>
                 <Separator className="my-4" />
-                <div>
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                    <Hash className="h-3 w-3" />
-                    Credit Agreement NFT
-                  </p>
-                  <p className="font-mono text-xs text-muted-foreground break-all">
-                    {credit.nft_mint_address}
-                  </p>
+                <div className="space-y-3">
+                  {credit.tx_signature && (
+                    <div>
+                      <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                        <Hash className="h-3 w-3" />
+                        Credit Creation — On-chain
+                      </p>
+                      <a
+                        href={`https://explorer.solana.com/tx/${credit.tx_signature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-mono text-xs text-primary underline break-all"
+                      >
+                        {credit.tx_signature.slice(0, 20)}…
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    </div>
+                  )}
+                  {credit.repayment_tx_signature && (
+                    <div>
+                      <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                        <Hash className="h-3 w-3" />
+                        Repayment — On-chain
+                      </p>
+                      <a
+                        href={`https://explorer.solana.com/tx/${credit.repayment_tx_signature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-mono text-xs text-primary underline break-all"
+                      >
+                        {credit.repayment_tx_signature.slice(0, 20)}…
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </>
             )}
