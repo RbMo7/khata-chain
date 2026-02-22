@@ -2,7 +2,7 @@
 
 An on-chain credit bureau for informal economies, built on Solana.
 
-Live: https://khata-chain.vercel.app
+Live: https://hisabkitab.rbmo.xyz/
 Repository: https://github.com/RbMo7/khata-chain
 
 ---
@@ -42,6 +42,20 @@ The platform charges no gas fees to borrowers. All SOL transaction costs are cov
 - Position-agnostic: the same system works for a corner shop in Kathmandu, a market trader in Lagos, or a gig worker in Jakarta.
 - As the borrower's on-chain history grows, it becomes portable collateral for accessing progressively larger or more formal credit products.
 - Because reputation data is publicly verifiable via wallet address, third parties can integrate without requiring API agreements or data-sharing arrangements.
+
+---
+
+## Creative Use Cases
+
+**Migrant worker credit portability.** A construction worker builds a repayment history with local suppliers in Nepal over three years. When they move to Qatar for work, they take nothing with them that a lender can verify — no bank statements, no formal payslips, no credit report. With KhataChain, they present their wallet address. The on-chain history is already there, immutable, timestamped, and readable by anyone with an internet connection. A remittance company or employer-linked lender in Qatar can verify it in seconds without contacting a bureau that doesn't exist in that jurisdiction.
+
+**Cooperative lending pools.** A village self-help group maintains a shared lending fund. Rather than keeping a manual register of who repaid and who didn't, each transaction is recorded on KhataChain. Members who consistently repay on time achieve higher reputation scores. The cooperative's governance rules can tie borrowing limits directly to score thresholds — enforced by the data, not by the committee's memory of who repaid two years ago.
+
+**NGO and microfinance integration.** An NGO running a microloan programme typically handles eligibility assessment manually, which is slow and expensive. If applicants have KhataChain histories, the NGO can call the public verifier API, retrieve a score and a tamper-proof on-chain commitment, and automate the eligibility decision. No data-sharing agreement is needed because the data is already public. The hash on-chain means the applicant cannot alter their history between when they applied and when the NGO checks.
+
+**Disaster recovery lending.** After a flood or earthquake, governments and aid organisations need to extend emergency credit quickly to affected households. Traditional credit assessment collapses in disaster contexts because records are destroyed and institutions are offline. If a borrower's reputation is already anchored on-chain before the disaster, any relief lender can assess risk and recover funds later through the same repayment infrastructure, regardless of what happened to local paper records.
+
+**Supplier finance for small manufacturers.** A small garment manufacturer buys fabric on credit from a textile wholesaler. The wholesaler records the transaction on KhataChain. When the manufacturer later approaches a supply chain finance platform for early payment on a purchase order, the finance platform can verify the manufacturer's repayment history with multiple suppliers, all on-chain, rather than relying on invoices the manufacturer provides themselves.
 
 ---
 
