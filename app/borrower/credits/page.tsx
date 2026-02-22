@@ -5,13 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ArrowUpRight, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowUpRight, AlertCircle, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
 import { useApi } from '@/hooks/use-api'
 import { borrowerApi } from '@/lib/api-client'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function BorrowerCredits() {
+  const { user } = useAuth()
   // Fetch active credits from API
   const { data: creditsData, loading, error } = useApi(
     () => borrowerApi.getCredits('active'),
@@ -37,7 +39,17 @@ export default function BorrowerCredits() {
   }
 
   const getStatusColor = (status: string) => {
-    return status === 'overdue' ? 'destructive' : 'default'
+    switch (status) {
+      case 'overdue': return 'destructive'
+      case 'completed': return 'outline'
+      default: return 'default'
+    }
+  }
+
+  const getStatusClassName = (status: string) => {
+    return status === 'completed'
+      ? 'border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800'
+      : ''
   }
 
   const totalOutstanding = activeCredits.reduce((sum: number, credit: any) => sum + credit.credit_amount, 0)
@@ -61,6 +73,33 @@ export default function BorrowerCredits() {
             Failed to load credits. Please try refreshing the page.
           </AlertDescription>
         </Alert>
+      </DashboardLayout>
+    )
+  }
+
+  // Verification wall — must verify NID before seeing / repaying credits
+  if (!user?.citizenshipVerified) {
+    return (
+      <DashboardLayout userType="borrower">
+        <div className="max-w-lg mx-auto mt-16 space-y-6 text-center">
+          <div className="flex justify-center">
+            <div className="p-5 rounded-full bg-destructive/10">
+              <ShieldAlert className="h-12 w-12 text-destructive" />
+            </div>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">NID Verification Required</h2>
+            <p className="text-muted-foreground mt-2">
+              You must verify your National Identity Document (NID) before you can receive or repay credits.
+            </p>
+          </div>
+          <Link href="/borrower/verify">
+            <Button size="lg" className="gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Verify My NID Now
+            </Button>
+          </Link>
+        </div>
       </DashboardLayout>
     )
   }
@@ -121,7 +160,7 @@ export default function BorrowerCredits() {
                           {credit.description || 'No description'}
                         </CardDescription>
                       </div>
-                      <Badge variant={getStatusColor(credit.status)}>
+                      <Badge variant={getStatusColor(credit.status)} className={getStatusClassName(credit.status)}>
                         {credit.status}
                       </Badge>
                     </div>
@@ -135,12 +174,12 @@ export default function BorrowerCredits() {
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Due {formatDate(credit.due_date)}
-                            {isOverdue && (
+                            {credit.status !== 'completed' && isOverdue && (
                               <span className="text-destructive ml-1">
                                 (Overdue by {Math.abs(daysUntilDue)} days)
                               </span>
                             )}
-                            {!isOverdue && (
+                            {credit.status !== 'completed' && !isOverdue && (
                               <span className="ml-1">
                                 (in {daysUntilDue} days)
                               </span>

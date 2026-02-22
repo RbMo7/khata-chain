@@ -4,31 +4,32 @@ import { useState } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CitizenshipVerification } from '@/components/CitizenshipVerification'
-import { 
-  Shield, 
-  CheckCircle, 
+import { useAuth } from '@/contexts/AuthContext'
+import {
+  Shield,
+  CheckCircle,
   AlertCircle,
   Lock,
-  Info
+  Info,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function BorrowerVerify() {
   const router = useRouter()
+  const { user, updateUser } = useAuth()
   const [step, setStep] = useState<'info' | 'verify' | 'success'>('info')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleVerificationComplete = () => {
+    // Update the in-memory auth context immediately so every page
+    // sees citizenshipVerified=true without waiting for a full re-login
+    updateUser({ citizenshipVerified: true })
     setStep('success')
-    // Redirect to dashboard after 3 seconds
     setTimeout(() => {
       router.push('/borrower/dashboard')
-    }, 3000)
+    }, 2500)
   }
 
   if (step === 'success') {
@@ -166,13 +167,15 @@ export default function BorrowerVerify() {
           <>
             <Card>
               <CardHeader>
-                <CardTitle>Enter Your Details</CardTitle>
+                <CardTitle>Enter Your NID Number</CardTitle>
                 <CardDescription>
-                  Provide your citizenship identification number
+                  Your National Identity Document number is used for one-time verification only.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <CitizenshipVerification
+                  walletAddress={user?.walletAddress ?? ''}
+                  borrowerPubkey={user?.walletAddress ?? ''}
                   onVerified={handleVerificationComplete}
                   onError={(err) => setError(err)}
                 />
@@ -182,7 +185,7 @@ export default function BorrowerVerify() {
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Supported IDs: Aadhaar (India), Social Security Number (USA), National ID, Passport Number
+                Your NID number is hashed with SHA-256 before being stored — the original number is never saved on our servers.
               </AlertDescription>
             </Alert>
           </>

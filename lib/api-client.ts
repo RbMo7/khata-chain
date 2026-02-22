@@ -173,6 +173,9 @@ export const borrowerApi = {
     const params = status ? `?status=${status}` : '';
     return get(`/api/borrower/credits${params}`);
   },
+
+  getExtensions: () =>
+    get('/api/borrower/extensions'),
 };
 
 /**
@@ -197,6 +200,9 @@ export const storeOwnerApi = {
     const queryString = queryParams.toString();
     return get(`/api/store-owner/credits${queryString ? `?${queryString}` : ''}`);
   },
+
+  getExtensions: () =>
+    get('/api/store-owner/extensions'),
 };
 
 /**
@@ -262,6 +268,28 @@ export const reputationApi = {
   getMy: () =>
     get('/api/borrower/reputation'),
 };
+
+/**
+ * Extension Request API endpoints
+ */
+export const extensionApi = {
+  /** Get the extension request for a credit (borrower or store owner). */
+  getForCredit: (creditId: string) =>
+    get(`/api/credits/${creditId}/extension`),
+
+  /** Borrower requests a due-date extension. */
+  request: (creditId: string, days: number, message?: string) =>
+    post(`/api/credits/${creditId}/extension`, { days, message }),
+
+  /** Store owner accepts or declines an extension request. */
+  respond: (
+    creditId: string,
+    action: 'accept' | 'decline',
+    adjustedDays?: number,
+    message?: string
+  ) =>
+    patch(`/api/credits/${creditId}/extension`, { action, adjustedDays, message }),
+}
 
 /**
  * Stripe API endpoints

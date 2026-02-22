@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
-import { getBorrowerCredits } from '@/lib/services'
+import { getBorrowerCredits, markOverdueCredits } from '@/lib/services'
 
 /**
  * GET /api/borrower/credits
@@ -12,6 +12,9 @@ async function handler(req: NextRequest) {
     const user = (req as any).user
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status') || 'all'
+
+    // Flip any active credits past their due date to 'overdue'
+    await markOverdueCredits()
 
     // Pass undefined for status if 'all', otherwise pass the specific status
     const filterStatus = status === 'all' ? undefined : status

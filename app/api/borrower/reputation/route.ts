@@ -7,8 +7,9 @@ import {
   getReputationTier,
   isLowScore,
   calculateProjectedScores,
+  processOverduePenalties,
 } from '@/lib/services/reputation.service'
-import { getBorrowerCredits } from '@/lib/services/credit-entries.service'
+import { getBorrowerCredits, markOverdueCredits } from '@/lib/services/credit-entries.service'
 
 /**
  * GET /api/borrower/reputation
@@ -30,11 +31,25 @@ async function handler(req: NextRequest) {
       return errorResponse('Reputation record not found', 404)
     }
 
+    // Flip active-but-past-due credits to 'overdue' first
+    await markOverdueCredits()
+
     // Fetch recent events
     const events = await getReputationEvents(borrowerPubkey, 30)
 
     // Fetch active credits to generate per-credit projections
     const activeCredits = await getBorrowerCredits(borrowerPubkey, 'active')
+
+    // Process daily overdue penalties (fire-and-forget, non-blocking)
+    const overdueCredits = await getBorrowerCredits(borrowerPubkey, 'overdue')
+    if (overdueCredits.length > 0) {
+      processOverduePenalties(
+        borrowerPubkey,
+        overdueCredits.map((c) => ({ id: c.id, due_date: c.due_date as string | null }))
+      ).catch((err) =>
+        console.error('[Reputation API] processOverduePenalties error (non-fatal):', err)
+      )
+    }
 
     const projections = activeCredits.map((credit) => ({
       credit_id: credit.id,

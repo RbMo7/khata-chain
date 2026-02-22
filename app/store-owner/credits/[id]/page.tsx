@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -34,11 +37,13 @@ import {
   Hash,
   TrendingUp,
   Store,
+  CalendarClock,
+  MessageSquare,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
 import { useApi } from '@/hooks/use-api'
-import { creditApi } from '@/lib/api-client'
+import { creditApi, extensionApi } from '@/lib/api-client'
 import { useToast } from '@/hooks/use-toast'
 
 function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -85,12 +90,25 @@ export default function CreditDetailPage() {
   const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false)
   const [markingPaid, setMarkingPaid] = useState(false)
 
+  // Extension request response state
+  const [respondingExt, setRespondingExt] = useState(false)
+  const [extAdjustedDays, setExtAdjustedDays] = useState<string>('')
+  const [extResponseMessage, setExtResponseMessage] = useState('')
+  const [showDeclineConfirm, setShowDeclineConfirm] = useState(false)
+
   const {
     data: creditData,
     loading,
     error,
     refetch,
   } = useApi(() => creditApi.getById(creditId), [creditId])
+
+  const {
+    data: extensionData,
+    refetch: refetchExtension,
+  } = useApi(() => extensionApi.getForCredit(creditId), [creditId])
+
+  const extension = (extensionData as any)?.data?.extension || null
 
   const credit = creditData?.data
 
@@ -116,6 +134,35 @@ export default function CreditDetailPage() {
       })
     } finally {
       setMarkingPaid(false)
+    }
+  }
+
+  async function handleExtensionResponse(action: 'accept' | 'decline') {
+    setRespondingExt(true)
+    try {
+      const parsedDays = extAdjustedDays ? parseInt(extAdjustedDays, 10) : undefined
+      const finalDays = action === 'accept' && parsedDays && parsedDays > 0 ? parsedDays : undefined
+      await extensionApi.respond(creditId, action, finalDays, extResponseMessage.trim() || undefined)
+      toast({
+        title: action === 'accept' ? 'Extension accepted' : 'Extension declined',
+        description:
+          action === 'accept'
+            ? `Due date extended by ${finalDays ?? extension?.requested_days} days.`
+            : 'The borrower has been notified.',
+      })
+      setShowDeclineConfirm(false)
+      setExtAdjustedDays('')
+      setExtResponseMessage('')
+      refetch()
+      refetchExtension()
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Action failed',
+        description: err?.details?.error || err?.message || 'An unexpected error occurred.',
+      })
+    } finally {
+      setRespondingExt(false)
     }
   }
 
@@ -223,6 +270,146 @@ export default function CreditDetailPage() {
               This credit is past its due date. Contact the borrower or mark it as paid if cash has been received.
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Extension Request Card */}
+        {extension && (
+          <Card className={
+            extension.status === 'pending'
+              ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20'
+              : extension.status === 'accepted'
+              ? 'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20'
+              : 'border-border'
+          }>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarClock className="h-4 w-4 text-primary" />
+                Due-Date Extension Request
+                <Badge
+                  variant="outline"
+                  className={
+                    extension.status === 'pending'
+                      ? 'border-amber-500 text-amber-600 bg-amber-50 ml-auto'
+                      : extension.status === 'accepted'
+                      ? 'border-emerald-500 text-emerald-600 bg-emerald-50 ml-auto'
+                      : 'ml-auto'
+                  }
+                >
+                  {extension.status.charAt(0).toUpperCase() + extension.status.slice(1)}
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                {extension.status === 'pending'
+                  ? 'The borrower has requested more time. Review and respond below.'
+                  : extension.status === 'accepted'
+                  ? 'You accepted this extension request.'
+                  : 'You declined this extension request.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Request details */}
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">Requested Days</p>
+                  <p className="font-semibold text-lg">{extension.requested_days}</p>
+                </div>
+                {extension.adjusted_days && extension.adjusted_days !== extension.requested_days && (
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">Granted Days</p>
+                    <p className="font-semibold text-lg text-emerald-600">{extension.adjusted_days}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">Requested On</p>
+                  <p>{formatDateNP(extension.created_at)}</p>
+                </div>
+                {extension.responded_at && (
+                  <div>
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide mb-1">Responded On</p>
+                    <p>{formatDateNP(extension.responded_at)}</p>
+                  </div>
+                )}
+              </div>
+
+              {extension.message && (
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <MessageSquare className="h-3 w-3" />
+                    Borrower message
+                  </div>
+                  <p className="text-sm">{extension.message}</p>
+                </div>
+              )}
+
+              {extension.response_message && (
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <MessageSquare className="h-3 w-3" />
+                    Your response
+                  </div>
+                  <p className="text-sm">{extension.response_message}</p>
+                </div>
+              )}
+
+              {/* Response form – only shown when pending */}
+              {extension.status === 'pending' && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ext-days" className="text-sm">
+                        Adjust days (optional – leave blank to grant the requested {extension.requested_days} days)
+                      </Label>
+                      <Input
+                        id="ext-days"
+                        type="number"
+                        min={1}
+                        max={365}
+                        placeholder={String(extension.requested_days)}
+                        value={extAdjustedDays}
+                        onChange={(e) => setExtAdjustedDays(e.target.value)}
+                        className="max-w-[160px]"
+                        disabled={respondingExt}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ext-msg" className="text-sm">Message to borrower (optional)</Label>
+                      <Textarea
+                        id="ext-msg"
+                        rows={2}
+                        placeholder="Add a note for the borrower…"
+                        value={extResponseMessage}
+                        onChange={(e) => setExtResponseMessage(e.target.value)}
+                        disabled={respondingExt}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleExtensionResponse('accept')}
+                        disabled={respondingExt}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                      >
+                        {respondingExt ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        Accept Extension
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowDeclineConfirm(true)}
+                        disabled={respondingExt}
+                        className="border-destructive text-destructive hover:bg-destructive/10 gap-2"
+                      >
+                        Decline
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         <div className="grid gap-6 sm:grid-cols-2">
@@ -473,6 +660,36 @@ export default function CreditDetailPage() {
                   Confirm Paid
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Decline Extension confirmation dialog */}
+      <Dialog open={showDeclineConfirm} onOpenChange={setShowDeclineConfirm}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Decline Extension Request?</DialogTitle>
+            <DialogDescription>
+              The borrower will be notified that their request was declined.
+              The due date will not change.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeclineConfirm(false)}
+              disabled={respondingExt}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleExtensionResponse('decline')}
+              disabled={respondingExt}
+            >
+              {respondingExt && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Decline Request
             </Button>
           </DialogFooter>
         </DialogContent>

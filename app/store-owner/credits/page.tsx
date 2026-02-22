@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, ArrowUpRight, Download, Filter, Plus, AlertCircle, Loader2 } from 'lucide-react'
+import { Search, ArrowUpRight, Download, Filter, Plus, AlertCircle, Loader2, CalendarClock } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
 import { useApi } from '@/hooks/use-api'
@@ -41,6 +41,12 @@ export default function StoreOwnerCredits() {
     [statusFilter]
   )
 
+  const { data: extensionsData } = useApi(
+    () => storeOwnerApi.getExtensions(),
+    []
+  )
+  const pendingExtensions: any[] = (extensionsData as any)?.data?.extensions || []
+
   const credits = creditsData?.data?.credits || []
 
   const formatAmount = (amount: number) => {
@@ -54,10 +60,16 @@ export default function StoreOwnerCredits() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'default'
-      case 'completed': return 'secondary'
+      case 'completed': return 'outline'
       case 'overdue': return 'destructive'
       default: return 'outline'
     }
+  }
+
+  const getStatusClassName = (status: string) => {
+    return status === 'completed'
+      ? 'border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800'
+      : ''
   }
 
   const getDaysUntilDue = (dueDateString: string) => {
@@ -123,6 +135,35 @@ export default function StoreOwnerCredits() {
             </Button>
           </Link>
         </div>
+
+        {/* Pending Extension Requests banner */}
+        {pendingExtensions.length > 0 && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50/80 dark:bg-amber-950/20 dark:border-amber-800 p-4">
+            <div className="flex items-start gap-3">
+              <CalendarClock className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800 dark:text-amber-300">
+                  {pendingExtensions.length} Pending Extension Request{pendingExtensions.length !== 1 ? 's' : ''}
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {pendingExtensions.map((ext: any) => (
+                    <div key={ext.id} className="flex items-center justify-between text-sm">
+                      <span className="text-amber-700 dark:text-amber-400">
+                        {ext.borrower?.full_name || 'Borrower'} — {ext.requested_days} day{ext.requested_days !== 1 ? 's' : ''} requested
+                      </span>
+                      <Link href={`/store-owner/credits/${ext.credit_entry_id}`}>
+                        <Button size="sm" variant="outline" className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100">
+                          Review
+                          <ArrowUpRight className="ml-1 h-3 w-3" />
+                        </Button>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -267,7 +308,7 @@ export default function StoreOwnerCredits() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={getStatusColor(credit.status)}>
+                            <Badge variant={getStatusColor(credit.status)} className={getStatusClassName(credit.status)}>
                               {credit.status}
                             </Badge>
                           </TableCell>

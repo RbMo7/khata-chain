@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { DashboardLayout } from '@/components/DashboardLayout'
 import { PendingCreditsActions } from '@/components/PendingCreditsActions'
+import { ExtensionRequestDialog } from '@/components/ExtensionRequestDialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +20,8 @@ import {
   Wallet,
   ShieldCheck,
   Loader2,
-  Award
+  Award,
+  Calendar,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
@@ -26,8 +29,33 @@ import { useApi } from '@/hooks/use-api'
 import { borrowerApi, reputationApi } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
 
+function ExtensionStatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
+  if (status === 'pending') {
+    return (
+      <Badge variant="outline" className="border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-400 text-xs">
+        Extension Pending
+      </Badge>
+    )
+  }
+  if (status === 'accepted') {
+    return (
+      <Badge variant="outline" className="border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 text-xs">
+        Extension Accepted
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="outline" className="text-muted-foreground text-xs">
+      Extension Declined
+    </Badge>
+  )
+}
+
 export default function BorrowerDashboard() {
   const { user } = useAuth()
+  
+  // Extension request dialog state
+  const [extensionCreditId, setExtensionCreditId] = useState<string | null>(null)
   
   // Fetch real data from API
   const { data: stats, loading: statsLoading, error: statsError } = useApi(
@@ -45,9 +73,16 @@ export default function BorrowerDashboard() {
     []
   )
 
+  const { data: extensionsData, refetch: refetchExtensions } = useApi(
+    () => borrowerApi.getExtensions(),
+    []
+  )
+
   const activeCredits = creditsData?.data?.credits || []
   const reputationScore = reputationData?.data?.reputation?.reputation_score ?? null
   const reputationTier = reputationData?.data?.reputation?.tier ?? null
+  // Extension requests keyed by credit_entry_id
+  const extensionsByCredit: Record<string, any> = extensionsData?.data?.extensions || {}
 
   const getRepScoreColor = (score: number | null) => {
     if (score === null) return 'text-muted-foreground'
@@ -71,10 +106,16 @@ export default function BorrowerDashboard() {
       case 'overdue':
         return 'destructive'
       case 'completed':
-        return 'secondary'
+        return 'outline'
       default:
         return 'default'
     }
+  }
+
+  const getStatusClassName = (status: string) => {
+    return status === 'completed'
+      ? 'border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800'
+      : ''
   }
 
   const getDaysUntilDue = (dueDateString: string) => {
@@ -229,6 +270,9 @@ export default function BorrowerDashboard() {
                   {activeCredits.map((credit: any) => {
                     const daysUntilDue = getDaysUntilDue(credit.due_date)
                     const isOverdue = daysUntilDue < 0
+                    const extension = extensionsByCredit[credit.id]
+                    const canRequestExtension =
+                      (isOverdue || credit.status === 'active') && !extension
 
                     return (
                       <div
@@ -236,15 +280,18 @@ export default function BorrowerDashboard() {
                         className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors"
                       >
                         <div className="flex-1 mb-3 sm:mb-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="font-semibold">{credit.store_owner?.store_name || 'Store'}</h3>
-                            <Badge variant={getStatusColor(credit.status)}>
+                            <Badge variant={getStatusColor(credit.status)} className={getStatusClassName(credit.status)}>
                               {credit.status}
                             </Badge>
+                            {extension && (
+                              <ExtensionStatusBadge status={extension.status} />
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Due {formatDate(credit.due_date)}
-                            {isOverdue ? (
+                            {credit.status !== 'completed' && (isOverdue ? (
                               <span className="text-destructive ml-1">
                                 (Overdue by {Math.abs(daysUntilDue)} days)
                               </span>
@@ -252,10 +299,25 @@ export default function BorrowerDashboard() {
                               <span className="ml-1">
                                 (in {daysUntilDue} days)
                               </span>
-                            )}
+                            ))}
                           </p>
+                          {extension?.status === 'pending' && (
+                            <p className="text-xs text-amber-600 mt-0.5">
+                              Extension of {extension.requested_days} day{extension.requested_days === 1 ? '' : 's'} pending lender response
+                            </p>
+                          )}
+                          {extension?.status === 'accepted' && (
+                            <p className="text-xs text-emerald-600 mt-0.5">
+                              Extension of {extension.adjusted_days ?? extension.requested_days} day{(extension.adjusted_days ?? extension.requested_days) === 1 ? '' : 's'} accepted by lender
+                            </p>
+                          )}
+                          {extension?.status === 'declined' && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Extension request was declined by lender
+                            </p>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
                           <div className="text-right">
                             <div className="text-lg font-bold">
                               {formatAmount(credit.credit_amount)}
@@ -264,12 +326,25 @@ export default function BorrowerDashboard() {
                               {credit.currency || 'NPR'}
                             </div>
                           </div>
-                          <Link href={`/borrower/repay?credit_entry_id=${credit.id}`}>
-                            <Button size="sm">
-                              Repay Now
-                              <ArrowUpRight className="ml-1 h-3 w-3" />
-                            </Button>
-                          </Link>
+                          <div className="flex flex-col gap-1">
+                            <Link href={`/borrower/repay?credit_entry_id=${credit.id}`}>
+                              <Button size="sm">
+                                Repay Now
+                                <ArrowUpRight className="ml-1 h-3 w-3" />
+                              </Button>
+                            </Link>
+                            {canRequestExtension && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs gap-1"
+                                onClick={() => setExtensionCreditId(credit.id)}
+                              >
+                                <Calendar className="h-3 w-3" />
+                                Request Extension
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )
@@ -290,22 +365,22 @@ export default function BorrowerDashboard() {
           </TabsContent>
         </Tabs>
 
-        {/* Citizenship Verification Banner */}
+        {/* NID Verification — required to receive credits */}
         {!user?.citizenshipVerified && (
-          <Card className="border-chart-2/50 bg-chart-2/5">
+          <Card className="border-destructive/50 bg-destructive/5">
             <CardHeader>
               <div className="flex items-start gap-4">
-                <AlertCircle className="h-5 w-5 text-chart-2 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
                 <div className="flex-1">
-                  <CardTitle className="text-lg">Verify Your Citizenship</CardTitle>
+                  <CardTitle className="text-lg text-destructive">NID Verification Required</CardTitle>
                   <CardDescription className="mt-1">
-                    Complete citizenship verification to unlock higher credit limits and better terms.
-                    Your information is secured using SHA-256 hashing.
+                    You cannot receive or accept credits until you verify your National Identity Document (NID).
+                    Verification is a one-time step and takes under a minute.
                   </CardDescription>
                   <Link href="/borrower/verify">
-                    <Button className="mt-4" variant="default">
+                    <Button className="mt-4" variant="destructive">
                       <ShieldCheck className="mr-2 h-4 w-4" />
-                      Start Verification
+                      Verify NID Now
                     </Button>
                   </Link>
                 </div>
@@ -314,6 +389,16 @@ export default function BorrowerDashboard() {
           </Card>
         )}
       </div>
+
+      {/* Extension Request Dialog */}
+      {extensionCreditId && (
+        <ExtensionRequestDialog
+          creditId={extensionCreditId}
+          open={!!extensionCreditId}
+          onOpenChange={(open) => { if (!open) setExtensionCreditId(null) }}
+          onSuccess={refetchExtensions}
+        />
+      )}
     </DashboardLayout>
   )
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
-import { getBorrowerStats } from '@/lib/services'
+import { getBorrowerStats, markOverdueCredits } from '@/lib/services'
 
 /**
  * GET /api/borrower/stats
@@ -9,6 +9,9 @@ import { getBorrowerStats } from '@/lib/services'
 async function handler(req: NextRequest) {
   try {
     const user = (req as any).user
+
+    // Flip any active credits past their due date to 'overdue'
+    await markOverdueCredits()
 
     const stats = await getBorrowerStats(user.walletAddress)
 

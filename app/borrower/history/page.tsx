@@ -51,10 +51,16 @@ export default function BorrowerHistory() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'default'
-      case 'completed': return 'secondary'
+      case 'completed': return 'outline'
       case 'overdue': return 'destructive'
       default: return 'outline'
     }
+  }
+
+  const getStatusClassName = (status: string) => {
+    return status === 'completed'
+      ? 'border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800'
+      : ''
   }
 
   const getTypeColor = (type: string) => {
@@ -242,7 +248,7 @@ export default function BorrowerHistory() {
                           {formatDate(credit.due_date)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStatusColor(credit.status)}>
+                          <Badge variant={getStatusColor(credit.status)} className={getStatusClassName(credit.status)}>
                             {credit.status}
                           </Badge>
                         </TableCell>

@@ -42,6 +42,7 @@ export type ReputationEventType =
   | 'paid_late_major'
   | 'paid_late_severe'
   | 'credit_overdue_weekly'
+  | 'credit_overdue_daily'
   | 'milestone_first_credit'
   | 'milestone_five_credits'
 
@@ -105,13 +106,17 @@ const SCORE_DELTAS: Record<string, number> = {
   account_created: 0,
   citizenship_verified: 50,
   credit_accepted: 5,
-  paid_early_major: 40,   // > 7 days early
-  paid_early_minor: 25,   // 1–7 days early
+  paid_early_major: 40,          // > 7 days early
+  paid_early_minor: 25,          // 1–7 days early
   paid_on_time: 20,
-  paid_late_minor: -15,   // 1–7 days late
-  paid_late_major: -40,   // 8–30 days late
-  paid_late_severe: -80,  // > 30 days late
+  paid_late_minor: -15,          // 1–7 days late
+  paid_late_major: -40,          // 8–30 days late
+  paid_late_severe: -80,         // > 30 days late
   credit_overdue_weekly: -10,
+  // Daily overdue penalties – scale with time
+  credit_overdue_daily_tier1: -3,  // days 1-7 overdue
+  credit_overdue_daily_tier2: -5,  // days 8-30 overdue
+  credit_overdue_daily_tier3: -8,  // days 31+ overdue
   milestone_first_credit: 30,
   milestone_five_credits: 50,
 }
@@ -497,6 +502,82 @@ export async function onCreditOverdueWeekly(
     undefined,
     { overdue_credits: (current.overdue_credits || 0) + 1 }
   )
+}
+
+/**
+ * Process daily overdue penalties for all overdue credits of a borrower.
+ *
+ * Penalty tiers:
+ *   Days 1–7  overdue → −3 / day
+ *   Days 8–30 overdue → −5 / day
+ *   Days 31+  overdue → −8 / day
+ *
+ * Idempotent per calendar day per credit – will not double-apply if called
+ * multiple times within the same 24-hour window.
+ *
+ * Call this:
+ *   • On every /api/borrower/reputation GET
+ *   • From /api/cron/overdue (scheduled task)
+ */
+export async function processOverduePenalties(
+  borrowerPubkey: string,
+  overdueCredits: Array<{ id: string; due_date: string | null }>
+): Promise<void> {
+  if (!overdueCredits.length) return
+
+  const now = new Date()
+
+  for (const credit of overdueCredits) {
+    if (!credit.due_date) continue
+
+    const dueDate = new Date(credit.due_date)
+    const daysOverdue = Math.max(
+      0,
+      Math.ceil((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+    )
+    if (daysOverdue === 0) continue
+
+    // Determine penalty tier
+    let deltaKey: string
+    if (daysOverdue <= 7) {
+      deltaKey = 'credit_overdue_daily_tier1'
+    } else if (daysOverdue <= 30) {
+      deltaKey = 'credit_overdue_daily_tier2'
+    } else {
+      deltaKey = 'credit_overdue_daily_tier3'
+    }
+
+    // Check when we last penalised this credit
+    const { data: lastEvent } = await supabaseAdmin
+      .from('reputation_events')
+      .select('created_at')
+      .eq('borrower_pubkey', borrowerPubkey)
+      .eq('credit_entry_id', credit.id)
+      .eq('event_type', 'credit_overdue_daily')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (lastEvent?.created_at) {
+      const lastPenaltyAt = new Date(lastEvent.created_at)
+      const hoursSince =
+        (now.getTime() - lastPenaltyAt.getTime()) / (1000 * 60 * 60)
+      if (hoursSince < 23) continue // already penalised today
+    }
+
+    const delta = SCORE_DELTAS[deltaKey]
+    const description = `Day ${daysOverdue} overdue (${delta} pts)`
+
+    await applyDelta(
+      borrowerPubkey,
+      delta,
+      'credit_overdue_daily',
+      description,
+      credit.id,
+      undefined,
+      {}
+    )
+  }
 }
 
 // ---------------------------------------------------------------------------

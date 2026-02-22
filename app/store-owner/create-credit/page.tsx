@@ -356,11 +356,25 @@ export default function CreateCreditPage() {
                 <ReputationBadge borrowerPubkey={selectedBorrower.borrower_pubkey} />
               </div>
 
+              {!selectedBorrower.citizenship_verified_at && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Cannot proceed.</strong> This borrower has not completed NID verification.
+                    They must verify their identity before you can issue credit to them.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <Button variant="outline" onClick={() => setStep('search')} className="flex-1">
                   Back
                 </Button>
-                <Button onClick={() => setStep('details')} className="flex-1">
+                <Button
+                  onClick={() => setStep('details')}
+                  className="flex-1"
+                  disabled={!selectedBorrower.citizenship_verified_at}
+                >
                   Continue
                 </Button>
               </div>

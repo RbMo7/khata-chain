@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
-import { getCreditEntryById, updateCreditStatus } from '@/lib/services'
+import { getCreditEntryById, updateCreditStatus, getBorrowerByPubkey } from '@/lib/services'
 import { createCreditNFT } from '@/lib/solana/credit-nft'
 import { onCreditAccepted } from '@/lib/services/reputation.service'
 
@@ -28,6 +28,15 @@ async function handler(req: NextRequest, { params }: { params: Promise<{ id: str
     // Verify borrower owns this credit
     if (credit.borrower_pubkey !== user.walletAddress) {
       return errorResponse('Unauthorized: This credit does not belong to you', 403)
+    }
+
+    // Verify borrower has completed NID verification
+    const borrower = await getBorrowerByPubkey(user.walletAddress)
+    if (!borrower?.citizenship_verified_at) {
+      return errorResponse(
+        'You must complete NID verification before accepting credit. Visit your profile to verify.',
+        403
+      )
     }
 
     // Verify credit is pending approval

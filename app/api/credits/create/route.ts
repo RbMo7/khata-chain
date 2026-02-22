@@ -54,6 +54,14 @@ async function handler(req: NextRequest) {
       return errorResponse('Borrower not found', 404)
     }
 
+    // Require NID verification before issuing credit
+    if (!borrower.citizenship_verified_at) {
+      return errorResponse(
+        'This borrower has not completed NID verification. They must verify their identity before receiving credit.',
+        403
+      )
+    }
+
     // Validate due date is in future
     const dueDateObj = new Date(dueDate)
     if (dueDateObj <= new Date()) {

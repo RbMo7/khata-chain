@@ -56,12 +56,18 @@ export default function StoreOwnerDashboard() {
       case 'overdue':
         return 'destructive'
       case 'completed':
-        return 'secondary'
+        return 'outline'
       case 'pending':
         return 'outline'
       default:
         return 'default'
     }
+  }
+
+  const getStatusClassName = (status: string) => {
+    return status === 'completed'
+      ? 'border-emerald-500 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800'
+      : ''
   }
 
   const getDaysUntilDue = (dueDateString: string) => {
@@ -241,13 +247,13 @@ export default function StoreOwnerDashboard() {
                         <div className="flex-1 mb-3 sm:mb-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold">{credit.borrower?.full_name || credit.borrower_pubkey}</h3>
-                            <Badge variant={getStatusColor(credit.status)}>
+                            <Badge variant={getStatusColor(credit.status)} className={getStatusClassName(credit.status)}>
                               {credit.status}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Created {formatDate(credit.created_at)} • Due {formatDate(credit.due_date)}
-                            {isOverdue && (
+                            {credit.status !== 'completed' && isOverdue && (
                               <span className="text-destructive ml-1">
                                 (Overdue by {Math.abs(daysUntilDue)} days)
                               </span>

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { withAuth, successResponse, errorResponse } from '@/lib/middleware/auth.middleware'
-import { getStoreOwnerCredits, getStoreOwnerRecentCredits } from '@/lib/services'
+import { getStoreOwnerCredits, getStoreOwnerRecentCredits, markOverdueCredits } from '@/lib/services'
 
 /**
  * GET /api/store-owner/credits
@@ -19,6 +19,9 @@ async function handler(req: NextRequest) {
     const status = (statusParam && statusParam !== 'all') ? statusParam as any : undefined
     const recent = searchParams.get('recent') === 'true'
     const limit = parseInt(searchParams.get('limit') || '50')
+
+    // Flip any active credits past their due date to 'overdue'
+    await markOverdueCredits()
 
     if (recent) {
       const credits = await getStoreOwnerRecentCredits(user.walletAddress, limit)

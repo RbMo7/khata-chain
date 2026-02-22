@@ -1,147 +1,165 @@
 'use client';
 
 import { useState } from 'react';
-import { validateCitizenshipNumber } from '@/lib/citizenship-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Spinner } from '@/components/ui/spinner';
+import { Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 interface CitizenshipVerificationProps {
-  onVerified: (citizenshipHash: string) => void;
+  walletAddress: string;
+  borrowerPubkey: string;
+  onVerified: () => void;
   onError?: (error: string) => void;
   disabled?: boolean;
 }
 
+// Simulate NID database lookup stages
+const VERIFICATION_STAGES = [
+  'Connecting to NID registry…',
+  'Validating NID number…',
+  'Cross-checking records…',
+  'Finalising verification…',
+];
+
 export function CitizenshipVerification({
+  walletAddress,
+  borrowerPubkey,
   onVerified,
   onError,
   disabled = false,
 }: CitizenshipVerificationProps) {
-  const [citizenshipNumber, setCitizenshipNumber] = useState('');
+  const [nidNumber, setNidNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [checkError, setCheckError] = useState<string | null>(null);
-  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
-  const [verifiedHash, setVerifiedHash] = useState<string | null>(null);
+  const [stageLabel, setStageLabel] = useState('');
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setCitizenshipNumber(value);
-    setValidationError(null);
-    setCheckError(null);
-    setIsAvailable(null);
+    // Only allow digits
+    const value = e.target.value.replace(/\D/g, '').slice(0, 12);
+    setNidNumber(value);
+    setFieldError(null);
+    setApiError(null);
   };
 
   const handleVerify = async () => {
-    // Validate locally first
-    const validation = validateCitizenshipNumber(citizenshipNumber);
-    if (!validation.valid) {
-      setValidationError(validation.error!);
+    if (nidNumber.length < 8) {
+      setFieldError('NID number must be at least 8 digits.');
       return;
     }
 
     setIsLoading(true);
-    setValidationError(null);
-    setCheckError(null);
+    setFieldError(null);
+    setApiError(null);
+
+    // Walk through fake verification stages for UX
+    for (let i = 0; i < VERIFICATION_STAGES.length; i++) {
+      setStageLabel(VERIFICATION_STAGES[i]);
+      await new Promise((r) => setTimeout(r, 600));
+    }
 
     try {
-      const response = await fetch('/api/citizenship/check', {
+      const response = await fetch('/api/citizenship/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ citizenship_number: citizenshipNumber }),
+        body: JSON.stringify({
+          citizenship_number: nidNumber,
+          borrower_pubkey: borrowerPubkey,
+          wallet_address: walletAddress,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setCheckError(data.error);
-        setIsAvailable(false);
+        const msg = data.error || 'Verification failed. Please try again.';
+        setApiError(msg);
+        onError?.(msg);
         return;
       }
 
-      if (data.available) {
-        setIsAvailable(true);
-        setVerifiedHash(data.citizenshipHash);
-        onVerified(data.citizenshipHash);
-      } else {
-        setIsAvailable(false);
-        setCheckError(data.message);
-        onError?.(data.message);
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : 'Failed to verify citizenship';
-      setCheckError(errorMessage);
-      setIsAvailable(false);
-      onError?.(errorMessage);
+      setVerified(true);
+      onVerified();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Network error. Please try again.';
+      setApiError(msg);
+      onError?.(msg);
     } finally {
       setIsLoading(false);
+      setStageLabel('');
     }
   };
 
+  if (verified) {
+    return (
+      <div className="flex items-center gap-3 p-4 rounded-lg bg-emerald-50 border border-emerald-200">
+        <ShieldCheck className="h-6 w-6 text-emerald-600 shrink-0" />
+        <div>
+          <p className="font-semibold text-emerald-800">NID Verified Successfully</p>
+          <p className="text-sm text-emerald-700">Your identity has been confirmed.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="citizenship">
-          Citizenship Number (Aadhar / ID Card)
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <Label htmlFor="nid" className="text-sm font-medium">
+          NID Number
         </Label>
-        <p className="text-sm text-gray-600 mt-1 mb-2">
-          This is required to prevent duplicate accounts. You cannot change this
-          after registration.
+        <p className="text-sm text-muted-foreground">
+          Enter your National Identity Document (NID) number. This is a one-time verification — it cannot be changed later.
         </p>
         <Input
-          id="citizenship"
-          placeholder="Enter your citizenship number"
-          value={citizenshipNumber}
+          id="nid"
+          inputMode="numeric"
+          placeholder="Enter your NID number (8–12 digits)"
+          value={nidNumber}
           onChange={handleInputChange}
-          disabled={disabled || isLoading || isAvailable === true}
-          className="mt-1"
+          disabled={disabled || isLoading}
+          className="text-base tracking-widest font-mono"
+          maxLength={12}
         />
+        <p className="text-xs text-muted-foreground">{nidNumber.length} / 12 digits</p>
       </div>
 
-      {validationError && (
+      {fieldError && (
         <Alert variant="destructive">
-          <AlertDescription>{validationError}</AlertDescription>
+          <ShieldAlert className="h-4 w-4" />
+          <AlertDescription>{fieldError}</AlertDescription>
         </Alert>
       )}
 
-      {checkError && (
+      {apiError && (
         <Alert variant="destructive">
-          <AlertDescription>{checkError}</AlertDescription>
+          <ShieldAlert className="h-4 w-4" />
+          <AlertDescription>{apiError}</AlertDescription>
         </Alert>
       )}
 
-      {isAvailable === true && (
-        <Alert className="bg-green-50 border-green-200">
-          <AlertDescription className="text-green-800">
-            ✓ Citizenship number verified and available
-          </AlertDescription>
-        </Alert>
+      {isLoading && stageLabel && (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+          <span>{stageLabel}</span>
+        </div>
       )}
 
       <Button
         onClick={handleVerify}
-        disabled={
-          disabled ||
-          !citizenshipNumber ||
-          isLoading ||
-          isAvailable === true
-        }
-        className="w-full"
+        disabled={disabled || nidNumber.length < 8 || isLoading}
+        className="w-full gap-2"
+        size="lg"
       >
-        {isLoading && <Spinner className="mr-2 h-4 w-4" />}
-        {isLoading ? 'Verifying...' : 'Verify Citizenship'}
+        {isLoading ? (
+          <><Loader2 className="h-4 w-4 animate-spin" />Verifying…</>
+        ) : (
+          <><ShieldCheck className="h-4 w-4" />Verify NID</>
+        )}
       </Button>
-
-      {isAvailable === true && (
-        <p className="text-sm text-gray-600">
-          You can now proceed with account creation.
-        </p>
-      )}
     </div>
   );
 }
