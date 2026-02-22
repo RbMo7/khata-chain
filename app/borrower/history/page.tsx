@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Search, ArrowUpRight, Download, Filter, AlertCircle, Loader2 } from 'lucide-react'
+import { Search, ArrowUpRight, Download, Filter, AlertCircle, Loader2, ExternalLink } from 'lucide-react'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
 import Link from 'next/link'
 import { useApi } from '@/hooks/use-api'
@@ -260,6 +260,17 @@ export default function BorrowerHistory() {
                                 <ArrowUpRight className="ml-1 h-3 w-3" />
                               </Button>
                             </Link>
+                          ) : credit.repayment_tx_signature ? (
+                            <a
+                              href={`https://explorer.solana.com/tx/${credit.repayment_tx_signature}?cluster=testnet`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/50">
+                                On-chain
+                                <ExternalLink className="ml-1 h-3 w-3" />
+                              </Button>
+                            </a>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
                           )}
