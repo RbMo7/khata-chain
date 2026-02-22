@@ -16,7 +16,8 @@ import {
   CheckCircle,
   Clock,
   Loader2,
-  CreditCard
+  CreditCard,
+  ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
@@ -236,12 +237,25 @@ export default function StoreOwnerDashboard() {
                               NPR
                             </div>
                           </div>
+                          {credit.status === 'completed' && credit.repayment_tx_signature ? (
+                            <a
+                              href={`https://explorer.solana.com/tx/${credit.repayment_tx_signature}?cluster=${process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? 'testnet'}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700">
+                                On-chain
+                                <ExternalLink className="ml-1 h-3 w-3" />
+                              </Button>
+                            </a>
+                          ) : (
                           <Link href={`/store-owner/credits/${credit.id}`}>
                             <Button size="sm" variant="ghost">
                               View
                               <ArrowUpRight className="ml-1 h-3 w-3" />
                             </Button>
                           </Link>
+                          )}
                         </div>
                       </div>
                     )
