@@ -17,7 +17,7 @@
 import { useCallback } from 'react'
 import { Connection, Transaction } from '@solana/web3.js'
 import { useAuth } from '@/contexts/AuthContext'
-import { anchorCreditOnChain, anchorRepaymentOnChain, sendSolPayment, fetchSolPrice } from '@/lib/solana/credit-chain'
+import { anchorRepaymentOnChain, sendSolPayment, fetchSolPrice } from '@/lib/solana/credit-chain'
 import { post } from '@/lib/api-client'
 
 export interface AnchorResult {
@@ -86,38 +86,16 @@ export function useOnChainAnchor() {
   const anchorCredit = useCallback(
     async (
       creditId: string,
-      amount: number,
-      dueDate: string,
-      borrowerPubkey: string,
-      storeOwnerPubkey: string,
-      currency = 'NPR'
+      _amount?: number,
+      _dueDate?: string,
+      _borrowerPubkey?: string,
+      _storeOwnerPubkey?: string,
+      _currency?: string
     ): Promise<AnchorResult | null> => {
-      const provider = getInjectedProvider(user?.walletType ?? 'Phantom')
-      const signerPubkey = user?.walletAddress
-
-      if (!provider || !signerPubkey) {
-        console.warn('[anchorCredit] No injected wallet found — skipping on-chain anchoring')
-        return null
-      }
-
+      // Credit anchoring is handled entirely server-side using the platform keypair.
+      // No user wallet signature or popup required — only repayments use the borrower's wallet.
       try {
-        const txSignature = await anchorCreditOnChain({
-          creditId,
-          amount,
-          currency,
-          dueDate,
-          borrowerPubkey,
-          storeOwnerPubkey,
-          signerPubkey,
-          sendTransaction: buildRelayFn(provider), // platform pays gas
-        })
-
-        const res = await post<{ data: AnchorResult }>('/api/solana/record-tx', {
-          creditId,
-          txSignature,
-          type: 'credit_created',
-        })
-
+        const res = await post<{ data: AnchorResult }>('/api/solana/anchor-credit', { creditId })
         console.log('[On-chain] Credit anchored:', res.data?.explorerUrl)
         return res.data
       } catch (err) {
@@ -126,7 +104,7 @@ export function useOnChainAnchor() {
         return null
       }
     },
-    [user]
+    []
   )
 
   const anchorRepayment = useCallback(
