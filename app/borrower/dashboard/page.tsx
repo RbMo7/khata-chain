@@ -233,22 +233,24 @@ export default function BorrowerDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="border-amber-200 bg-amber-50/10 dark:bg-amber-950/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                Loyalty Rewards
-              </CardTitle>
-              <Coins className="h-4 w-4 text-amber-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
-                {Number(stats?.data?.totalRewardsEarned || 0).toFixed(4)} SOL
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Earned for on-time payments
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/borrower/loyalty">
+            <Card className="border-amber-200 bg-amber-50/10 dark:bg-amber-950/10 cursor-pointer hover:bg-amber-50/20 dark:hover:bg-amber-950/20 transition-colors h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                  Loyalty Rewards
+                </CardTitle>
+                <Coins className="h-4 w-4 text-amber-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                  {Number(stats?.data?.totalRewardsEarned || 0).toFixed(4)} SOL
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  View roadmap & progress →
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Reputation and Share Row */}
