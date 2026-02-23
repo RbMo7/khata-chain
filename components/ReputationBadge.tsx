@@ -5,8 +5,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertTriangle, ShieldAlert, TrendingUp } from 'lucide-react'
+import { AlertTriangle, ShieldAlert, TrendingUp, Coins } from 'lucide-react'
 import { reputationApi } from '@/lib/api-client'
+import { LoyaltyBadge, BadgeTier } from './LoyaltyBadge'
 
 interface ReputationBadgeProps {
   borrowerPubkey: string
@@ -15,6 +16,8 @@ interface ReputationBadgeProps {
 interface ReputationData {
   reputation_score: number
   tier: string
+  badge_tier: BadgeTier
+  total_rewards_earned_sol: number
   warning: string | null
   is_low_score: boolean
   is_critical_score: boolean
@@ -94,25 +97,32 @@ export function ReputationBadge({ borrowerPubkey }: ReputationBadgeProps) {
   return (
     <div className="space-y-3">
       {/* Score + tier */}
-      <div className={`rounded-lg border p-3 ${styles.bg} ${styles.border}`}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <TrendingUp className={`h-4 w-4 ${styles.color}`} />
-            <span className="text-sm font-medium text-foreground">Reputation Score</span>
+      <div className={`rounded-lg border p-4 ${styles.bg} ${styles.border}`}>
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex gap-3">
+            <LoyaltyBadge tier={data.badge_tier} size="md" />
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-3xl font-extrabold tabular-nums ${styles.color}`}>
+                  {data.reputation_score}
+                </span>
+                <span className="text-muted-foreground text-sm">/ 1000</span>
+              </div>
+              <Badge variant="secondary" className={`${styles.color} font-semibold`}>
+                {data.tier}
+              </Badge>
+            </div>
           </div>
-          <Badge variant="secondary" className={`${styles.color} font-semibold`}>
-            {data.tier}
-          </Badge>
+          <div className="text-right">
+            <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 justify-end">
+              <Coins className="h-3.5 w-3.5" />
+              <span className="text-xs font-bold">{data.total_rewards_earned_sol.toFixed(4)} SOL</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-tight">Total Earned</p>
+          </div>
         </div>
 
-        <div className="flex items-end gap-2 mb-2">
-          <span className={`text-3xl font-extrabold tabular-nums ${styles.color}`}>
-            {data.reputation_score}
-          </span>
-          <span className="text-muted-foreground text-sm mb-1">/ 1000</span>
-        </div>
-
-        <Progress value={progressPct} className="h-2" />
+        <Progress value={progressPct} className="h-2 mb-2" />
 
         {/* Mini stats */}
         <div className="flex gap-4 mt-2 text-xs text-muted-foreground">

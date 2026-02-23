@@ -234,11 +234,19 @@ export async function getBorrowerStats(pubkey: string) {
       .eq('borrower_pubkey', pubkey)
       .eq('status', 'completed')
 
+    // Get reputation and rewards
+    const { data: reputation } = await supabaseAdmin
+      .from('borrower_reputation')
+      .select('total_rewards_earned_sol')
+      .eq('borrower_pubkey', pubkey)
+      .single()
+
     return {
       totalCredits: totalCredits || 0,
-      activeCredits: activeCredits || 0,
+      activeCreditsCount: activeCredits || 0,
       totalOwed,
-      completedPayments: completedPayments || 0,
+      completedPaymentsCount: completedPayments || 0,
+      totalRewardsEarned: reputation?.total_rewards_earned_sol || 0,
     }
   } catch (error) {
     console.error('Get borrower stats error:', error)

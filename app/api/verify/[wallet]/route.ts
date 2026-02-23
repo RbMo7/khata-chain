@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { getReputationTier } from '@/lib/services/reputation.service'
+import { getBadgeTier } from '@/lib/services/loyalty.service'
 import { getPlatformPublicKey } from '@/lib/solana/anchor-server'
 
 const NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'testnet'
@@ -34,7 +35,7 @@ export async function GET(
       'reputation_score, total_credits, on_time_payments, early_payments, ' +
       'late_payments_minor, late_payments_major, late_payments_severe, ' +
       'citizenship_bonus_applied, reputation_hash, reputation_hash_tx, ' +
-      'reputation_anchored_at, updated_at'
+      'reputation_anchored_at, updated_at, total_rewards_earned_sol'
     )
     .eq('borrower_pubkey', wallet)
     .single()
@@ -44,6 +45,7 @@ export async function GET(
   }
 
   const tier = getReputationTier(rep.reputation_score)
+  const badgeTier = getBadgeTier(rep.reputation_score)
 
   // ── Completed credits with on-chain proof ────────────────────────────────
   const { data: credits } = await supabaseAdmin
@@ -100,6 +102,8 @@ export async function GET(
       walletAddress: wallet,
       score: rep.reputation_score,
       tier: { label: tier.label, color: tier.color, description: tier.description },
+      badge_tier: badgeTier,
+      total_rewards_earned_sol: rep.total_rewards_earned_sol || 0,
       stats: {
         totalCredits: rep.total_credits ?? 0,
         onTimePayments: rep.on_time_payments ?? 0,

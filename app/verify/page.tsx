@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, ExternalLink, ShieldCheck, ShieldAlert, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Check } from 'lucide-react'
+import { Search, ExternalLink, ShieldCheck, ShieldAlert, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Check, Coins } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { LoyaltyBadge, BadgeTier } from '@/components/LoyaltyBadge'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,8 @@ interface VerifyResult {
   walletAddress: string
   score: number
   tier: TierInfo
+  badge_tier: BadgeTier
+  total_rewards_earned_sol: number
   stats: {
     totalCredits: number
     onTimePayments: number
@@ -195,17 +198,20 @@ export default function VerifierPage() {
             <Card className={`border-2 ${tierBg(result.tier.label)}`}>
               <CardContent className="pt-6 pb-5">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-5xl font-black ${tierTextColor(result.tier.label)}`}>
-                        {result.score}
-                      </span>
-                      <span className="text-muted-foreground text-sm mt-2">/ 1000</span>
+                  <div className="flex gap-4">
+                    <LoyaltyBadge tier={result.badge_tier} size="lg" />
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-5xl font-black ${tierTextColor(result.tier.label)}`}>
+                          {result.score}
+                        </span>
+                        <span className="text-muted-foreground text-sm mt-2">/ 1000</span>
+                      </div>
+                      <Badge variant="outline" className={`${tierTextColor(result.tier.label)} border-current font-semibold`}>
+                        {result.tier.label}
+                      </Badge>
+                      <p className="text-sm text-muted-foreground mt-2">{result.tier.description}</p>
                     </div>
-                    <Badge variant="outline" className={`${tierTextColor(result.tier.label)} border-current font-semibold`}>
-                      {result.tier.label}
-                    </Badge>
-                    <p className="text-sm text-muted-foreground mt-2">{result.tier.description}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-xs text-muted-foreground mb-1">Wallet</p>
@@ -220,6 +226,28 @@ export default function VerifierPage() {
                     )}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Loyalty Rewards */}
+            <Card className="border-amber-200 bg-amber-50/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-amber-600" />
+                  Loyalty Rewards
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Total SOL Earned</span>
+                  <span className="font-bold text-lg text-amber-700">
+                    {result.total_rewards_earned_sol.toFixed(4)} SOL
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Borrowers earn SOL rewards for consistent on-time repayments. This borrower has reached 
+                  the <span className="font-semibold text-foreground">{result.badge_tier}</span> tier.
+                </p>
               </CardContent>
             </Card>
 

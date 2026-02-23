@@ -73,7 +73,8 @@ async function handler(
         credit.borrower_pubkey,
         creditId,
         credit.due_date,
-        paidAt
+        paidAt,
+        credit.credit_amount
       )
     } catch (repErr) {
       console.error('[Confirm Repayment] Reputation update failed (non-fatal):', repErr)

@@ -28,6 +28,7 @@
 
 import { supabaseAdmin } from '../supabase/server'
 import { anchorReputationOnChain } from '../solana/anchor-server'
+import { checkRepaymentMilestones } from './loyalty.service'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,6 +44,7 @@ export type ReputationEventType =
   | 'paid_late_major'
   | 'paid_late_severe'
   | 'credit_overdue_weekly'
+  | 'credit_overdue_first_day'
   | 'credit_overdue_daily'
   | 'milestone_first_credit'
   | 'milestone_five_credits'
@@ -84,6 +86,7 @@ export interface ReputationTier {
   color: string        // Tailwind text color class
   bgColor: string      // Tailwind bg color class
   borderColor: string  // Tailwind border class
+  description: string
   min: number
   max: number
 }
@@ -113,11 +116,12 @@ const SCORE_DELTAS: Record<string, number> = {
   paid_late_minor: -15,          // 1–7 days late
   paid_late_major: -40,          // 8–30 days late
   paid_late_severe: -80,         // > 30 days late
-  credit_overdue_weekly: -10,
-  // Daily overdue penalties – scale with time
-  credit_overdue_daily_tier1: -3,  // days 1-7 overdue
-  credit_overdue_daily_tier2: -5,  // days 8-30 overdue
-  credit_overdue_daily_tier3: -8,  // days 31+ overdue
+  credit_overdue_weekly: -20,
+  // One-time hit the moment a credit becomes overdue
+  credit_overdue_first_day: -50,   // day 1 past due (applied once, ever)
+  // Daily penalties from day 2 onwards
+  credit_overdue_daily_tier1: -5,  // days 2-7 overdue
+  credit_overdue_daily_tier2: -8,  // days 8+ overdue
   milestone_first_credit: 30,
   milestone_five_credits: 50,
 }
@@ -132,24 +136,28 @@ export function getReputationTier(score: number): ReputationTier {
     color: 'text-emerald-600 dark:text-emerald-400',
     bgColor: 'bg-emerald-50 dark:bg-emerald-950/40',
     borderColor: 'border-emerald-500/40',
+    description: 'Elite credit history with maximum trust and reliability.',
   }
   if (score >= 700) return {
     label: 'Good', min: 700, max: 849,
     color: 'text-blue-600 dark:text-blue-400',
     bgColor: 'bg-blue-50 dark:bg-blue-950/40',
     borderColor: 'border-blue-500/40',
+    description: 'Highly reliable borrower with a strong track record.',
   }
   if (score >= 550) return {
     label: 'Fair', min: 550, max: 699,
     color: 'text-amber-600 dark:text-amber-400',
     bgColor: 'bg-amber-50 dark:bg-amber-950/40',
     borderColor: 'border-amber-500/40',
+    description: 'Demonstrates consistent repayment with minor delays.',
   }
   return {
     label: 'Building', min: 300, max: 549,
     color: 'text-red-600 dark:text-red-400',
     bgColor: 'bg-red-50 dark:bg-red-950/40',
     borderColor: 'border-red-500/40',
+    description: 'Currently building credit history; exercise normal caution.',
   }
 }
 
@@ -406,12 +414,14 @@ export async function onCreditAccepted(
  * Call when a credit is marked as completed / repaid.
  * @param dueDateIso  ISO string of the credit's due date
  * @param paidAtIso   ISO string of when it was actually paid
+ * @param paidAmountSol Optional: The amount in SOL for loyalty eligibility
  */
 export async function onCreditRepaid(
   borrowerPubkey: string,
   creditEntryId: string,
   dueDateIso: string,
-  paidAtIso: string
+  paidAtIso: string,
+  paidAmountSol: number = 0
 ) {
   const current = await initReputationIfNeeded(borrowerPubkey)
   if (!current) return null
@@ -489,6 +499,17 @@ export async function onCreditRepaid(
     (fresh.late_payments_major || 0) +
     (fresh.late_payments_severe || 0)
 
+  // Trigger Loyalty check (SOL rewards and milestones)
+  if (eventType === 'paid_early' || eventType === 'paid_on_time') {
+    const onTimeTotal = (fresh.on_time_payments || 0) + (fresh.early_payments || 0)
+    checkRepaymentMilestones(
+      borrowerPubkey,
+      onTimeTotal,
+      fresh.reputation_score,
+      paidAmountSol
+    ).catch(err => console.error('[reputation] Milestone check failed:', err))
+  }
+
   if (totalCompleted === 1 && !fresh.first_credit_bonus_applied) {
     await applyDelta(
       borrowerPubkey,
@@ -536,14 +557,16 @@ export async function onCreditOverdueWeekly(
 }
 
 /**
- * Process daily overdue penalties for all overdue credits of a borrower.
+ * Process overdue penalties for all overdue credits of a borrower.
  *
- * Penalty tiers:
- *   Days 1–7  overdue → −3 / day
- *   Days 8–30 overdue → −5 / day
- *   Days 31+  overdue → −8 / day
+ * Penalty structure:
+ *   Day 1 past due  → −50 (one-time, applied once ever per credit)
+ *   Days 2–7        → −5 / day
+ *   Days 8+         → −8 / day
+ *   Weekly (cron)   → −20 / week (via onCreditOverdueWeekly)
  *
- * Idempotent per calendar day per credit – will not double-apply if called
+ * No penalty on the due date itself — only from day 1 past due onwards.
+ * Idempotent per calendar day per credit — will not double-apply if called
  * multiple times within the same 24-hour window.
  *
  * Call this:
@@ -575,15 +598,36 @@ export async function processOverduePenalties(
     )
     if (daysOverdue === 0) continue
 
-    // Determine penalty tier
-    let deltaKey: string
-    if (daysOverdue <= 7) {
-      deltaKey = 'credit_overdue_daily_tier1'
-    } else if (daysOverdue <= 30) {
-      deltaKey = 'credit_overdue_daily_tier2'
-    } else {
-      deltaKey = 'credit_overdue_daily_tier3'
+    // ── Day 1: one-time -50 hit (never repeated for this credit) ─────────────
+    if (daysOverdue >= 1) {
+      const { data: firstDayEvent } = await supabaseAdmin
+        .from('reputation_events')
+        .select('id')
+        .eq('borrower_pubkey', borrowerPubkey)
+        .eq('credit_entry_id', credit.id)
+        .eq('event_type', 'credit_overdue_first_day')
+        .limit(1)
+        .maybeSingle()
+
+      if (!firstDayEvent) {
+        await applyDelta(
+          borrowerPubkey,
+          SCORE_DELTAS.credit_overdue_first_day,
+          'credit_overdue_first_day',
+          `First day overdue – immediate penalty`,
+          credit.id,
+          undefined,
+          {}
+        )
+      }
     }
+
+    // ── Day 2+: daily penalty ─────────────────────────────────────────────────
+    if (daysOverdue < 2) continue
+
+    const deltaKey = daysOverdue <= 7
+      ? 'credit_overdue_daily_tier1'   // -5/day, days 2-7
+      : 'credit_overdue_daily_tier2'   // -8/day, days 8+
 
     // Idempotency: skip if already penalised for this credit today (UTC)
     const { data: todayEvent } = await supabaseAdmin
@@ -599,13 +643,11 @@ export async function processOverduePenalties(
     if (todayEvent) continue // already applied today
 
     const delta = SCORE_DELTAS[deltaKey]
-    const description = `Day ${daysOverdue} overdue (${delta} pts)`
-
     await applyDelta(
       borrowerPubkey,
       delta,
       'credit_overdue_daily',
-      description,
+      `Day ${daysOverdue} overdue (${delta} pts)`,
       credit.id,
       undefined,
       {}

@@ -6,6 +6,7 @@ import {
   isLowScore,
   isCriticalScore,
 } from '@/lib/services/reputation.service'
+import { getBadgeTier } from '@/lib/services/loyalty.service'
 
 /**
  * GET /api/reputation/[borrowerPubkey]
@@ -34,6 +35,7 @@ export async function GET(
     }
 
     const tier = getReputationTier(reputation.reputation_score)
+    const badgeTier = getBadgeTier(reputation.reputation_score)
     const low = isLowScore(reputation.reputation_score)
     const critical = isCriticalScore(reputation.reputation_score)
 
@@ -43,6 +45,8 @@ export async function GET(
         borrower_pubkey: reputation.borrower_pubkey,
         reputation_score: reputation.reputation_score,
         tier: tier.label,
+        badge_tier: badgeTier,
+        total_rewards_earned_sol: (reputation as any).total_rewards_earned_sol || 0,
         warning: low
           ? critical
             ? 'Critical – this borrower has very poor credit history. Exercise extreme caution.'

@@ -23,12 +23,14 @@ import {
   Award,
   Calendar,
   Share2,
+  Coins,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatNPR, formatDateNP } from '@/lib/currency-utils'
 import { useApi } from '@/hooks/use-api'
 import { borrowerApi, reputationApi } from '@/lib/api-client'
 import { useAuth } from '@/contexts/AuthContext'
+import { LoyaltyBadge } from '@/components/LoyaltyBadge'
 
 function ExtensionStatusBadge({ status }: { status: 'pending' | 'accepted' | 'declined' }) {
   if (status === 'pending') {
@@ -231,9 +233,29 @@ export default function BorrowerDashboard() {
             </CardContent>
           </Card>
 
+          <Card className="border-amber-200 bg-amber-50/10 dark:bg-amber-950/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                Loyalty Rewards
+              </CardTitle>
+              <Coins className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                {Number(stats?.data?.totalRewardsEarned || 0).toFixed(4)} SOL
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Earned for on-time payments
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Reputation and Share Row */}
+        <div className="grid gap-4 md:grid-cols-3">
           {/* Reputation Score Card */}
-          <Link href="/borrower/profile?tab=reputation">
-            <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
+          <Link href="/borrower/profile?tab=reputation" className="md:col-span-1">
+            <Card className="cursor-pointer hover:bg-accent/50 transition-colors h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                   Reputation Score
@@ -241,8 +263,17 @@ export default function BorrowerDashboard() {
                 <Award className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${getRepScoreColor(reputationScore)}`}>
-                  {reputationScore ?? '—'}
+                <div className="flex items-center gap-3">
+                  {reputationScore && (
+                    <LoyaltyBadge 
+                      tier={reputationScore >= 850 ? 'Platinum' : reputationScore >= 700 ? 'Gold' : reputationScore >= 550 ? 'Silver' : 'Bronze'} 
+                      showLabel={false} 
+                      size="sm" 
+                    />
+                  )}
+                  <div className={`text-2xl font-bold ${getRepScoreColor(reputationScore)}`}>
+                    {reputationScore ?? '—'}
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {reputationTier ?? 'Loading...'} · View details →
@@ -250,30 +281,30 @@ export default function BorrowerDashboard() {
               </CardContent>
             </Card>
           </Link>
-        </div>
 
-        {/* Share reputation CTA */}
-        {user?.walletAddress && (
-          <Card className="border-dashed">
-            <CardContent className="py-4 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-primary/10">
-                  <ShieldCheck className="h-4 w-4 text-primary" />
+          {/* Share reputation CTA */}
+          {user?.walletAddress && (
+            <Card className="border-dashed md:col-span-2">
+              <CardContent className="py-0 h-full flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-primary/10">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Share your reputation</p>
+                    <p className="text-xs text-muted-foreground">Let lenders and merchants verify your credit score publicly</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">Share your reputation</p>
-                  <p className="text-xs text-muted-foreground">Let lenders and merchants verify your credit score publicly</p>
-                </div>
-              </div>
-              <Link href={`/verify?wallet=${user.walletAddress}`} target="_blank">
-                <Button variant="outline" size="sm" className="gap-2 shrink-0">
-                  <Share2 className="h-3.5 w-3.5" />
-                  Open verifier
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
+                <Link href={`/verify?wallet=${user.walletAddress}`} target="_blank">
+                  <Button variant="outline" size="sm" className="gap-2 shrink-0">
+                    <Share2 className="h-3.5 w-3.5" />
+                    Open verifier
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="active" className="space-y-4">
