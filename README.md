@@ -46,9 +46,24 @@ Projected additional revenue streams at scale:
 
 - **API access tier for lenders.** Third-party lenders and NGOs querying the reputation API in bulk pay a monthly access fee for rate-limited institutional access.
 - **Verified store badge.** Store owners who want a "KhataChain Verified" badge displayed to borrowers pay a one-time or annual verification fee.
+- **Store Owner Access Fees.** Future implementations will introduce a commission model or a one-time joining fee for store owners to access the platform's advanced credit management and verification tools.
 - **Data analytics (anonymised).** Aggregate repayment patterns, default rates by region, and credit demand data are commercially valuable to microfinance institutions and development banks. Sold in anonymised, aggregated form with no individual data shared.
 
 The core user-facing product (issuing credits, repaying, viewing history) remains free for both borrowers and store owners. Revenue is extracted only at the moment of successful repayment, which aligns the platform's financial incentive with the borrower actually completing their obligation.
+
+---
+
+## Khata-Loyalty Program
+
+To further incentivize timely repayments and build high-quality credit history, KhataChain implements a direct reward system:
+
+- **SOL Cashback:** Borrowers earn real SOL rewards for hitting repayment milestones (e.g., 1st, 5th, 10th on-time payment) and achieving elite reputation scores. These rewards are funded automatically from the protocol fee revenue, creating a circular economy.
+- **Reputation Tiers:** Borrowers are assigned badges based on their score:
+  - **Bronze (Building):** 300–549
+  - **Silver (Fair):** 550–699
+  - **Gold (Good):** 700–849
+  - **Platinum (Excellent):** 850–1000
+- **Visual Status:** These badges are displayed on the public verifier page, acting as a "trust signal" to potential lenders.
 
 ---
 
